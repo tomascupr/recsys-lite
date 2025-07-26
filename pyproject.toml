@@ -10,16 +10,16 @@ packages = [{include = "recsys_lite", from = "src"}]
 [tool.poetry.dependencies]
 python = "^3.11"
 duckdb = "^1.2.2"
-typer = ">=0.8.0,<0.9.0"
+typer = ">=0.8.0,<0.17.0"
 implicit = "^0.7.0"
 gensim = "^4.3.1"
 # Using LightFM 1.17 (latest version)
 # Skipped in CI environment by using mock implementation
 lightfm = {version = "==1.17", optional = true}
-optuna = ">=3.3.0,<4.0.0"
+optuna = ">=3.3.0,<5.0.0"
 faiss-cpu = "^1.7.4"
-fastapi = ">=0.100.0,<0.101.0"
-uvicorn = ">=0.23.0,<0.24.0"
+fastapi = ">=0.100.0,<0.117.0"
+uvicorn = ">=0.23.0,<0.36.0"
 pydantic = "^2.0.0"
 numpy = "^1.24.0"
 scipy = "^1.11.0"
@@ -38,15 +38,15 @@ mq = ["pika", "kafka-python"]
 llm = ["sentence-transformers", "optimum", "onnxruntime"]
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.4.0"
+pytest = "^8.0.0"
 mypy = "^1.5.0"
-ruff = "^0.1.8"
-black = "^23.7.0"
+ruff = "^0.12.0"
+black = "^25.0.0"
 isort = "^5.12.0"
-pytest-cov = "^4.1.0"
-requests = "^2.32.3"
-httpx = "^0.27.0"
-optuna = "^3.3.0"
+pytest-cov = "^6.0.0"
+requests = "^2.32.4"
+httpx = "^0.28.0"
+optuna = "^4.0.0"
 gensim = "^4.3.1"
 
 [tool.poetry.scripts]
