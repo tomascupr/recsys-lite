@@ -5,6 +5,21 @@ All notable changes to the RecSys-Lite project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2025-07-26
+
+### Security
+- Updated FastAPI from 0.100.x to 0.116.x to address Starlette security vulnerabilities
+- Updated uvicorn from 0.23.x to 0.35.x for security improvements
+- Updated requests from 2.32.3 to 2.32.4 to fix CVE
+- Updated urllib3 from 2.4.0 to 2.5.0 for security patches
+- Updated certifi to latest version for certificate bundle updates
+- Updated all development dependencies to latest secure versions
+
+### Changed
+- Expanded dependency version ranges to allow minor updates
+- Updated Poetry lock file with all security patches
+- Modernized README with compelling developer-focused messaging
+
 ## [0.3.0] - 2025-04-20
 
 ### Added

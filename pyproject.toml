@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "recsys-lite"
-version = "0.3.0"
+version = "0.3.1"
 description = "Lightweight recommendation system for small e-commerce shops"
 authors = ["RecSys-Lite Team <info@recsys-lite.com>"]
 license = "MIT"

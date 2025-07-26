@@ -2,7 +2,7 @@
 
 **Deploy state-of-the-art recommendations without selling your soul to AWS.**
 
-![RecSys-Lite](https://img.shields.io/badge/RecSys--Lite-v0.3.0-blue)
+![RecSys-Lite](https://img.shields.io/badge/RecSys--Lite-v0.3.1-blue)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100.0-green)
 ![React](https://img.shields.io/badge/React-18-blue)
