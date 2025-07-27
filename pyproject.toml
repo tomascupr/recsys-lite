@@ -28,6 +28,8 @@ pyarrow = "^15.0.0"
 # Message Queue support (optional dependencies)
 pika = {version = "^1.3.2", optional = true}
 kafka-python = {version = "^2.0.2", optional = true}
+# Cache dependencies (optional)
+redis = {version = "^5.0.0", optional = true}
 # LLM dependencies (optional)
 sentence-transformers = {version = "^2.2.2", optional = true}
 optimum = {version = "^1.13.1", optional = true}
@@ -35,6 +37,7 @@ onnxruntime = {version = "^1.16.1", optional = true}
 
 [tool.poetry.extras]
 mq = ["pika", "kafka-python"]
+cache = ["redis"]
 llm = ["sentence-transformers", "optimum", "onnxruntime"]
 
 [tool.poetry.group.dev.dependencies]
@@ -122,11 +125,13 @@ disable_error_code = ["attr-defined", "method-assign", "no-untyped-def", "no-unt
 [tool.ruff]
 line-length = 120           # increased for better readability
 target-version = "py311"
+
+[tool.ruff.lint]
 select = ["E", "F", "B", "I"]
 extend-select = ["I"]       # keep import‑sort rule
 ignore = ["B008"]  # Ignore function calls in argument defaults (common in FastAPI/Typer)
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "tests/*.py" = ["E402", "F401", "E501"]     # Test fixtures can use inline imports and mock imports
 "test_scripts/*.py" = ["E402"]              # Test scripts can use inline imports
 "src/recsys_lite/__init__.py" = ["E402", "F811", "I001"]  # Initialize module with complex setup

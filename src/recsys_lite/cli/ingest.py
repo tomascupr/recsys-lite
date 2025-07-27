@@ -1,10 +1,12 @@
 """Ingestion commands for RecSys-Lite CLI."""
+
 from pathlib import Path
+
 import typer
 
 from recsys_lite.cli import app
-from recsys_lite.ingest import ingest_data, stream_events, queue_ingest
 from recsys_lite.cli.types import QueueType
+from recsys_lite.ingest import ingest_data, queue_ingest, stream_events
 
 
 @app.command()
@@ -31,8 +33,6 @@ def stream_ingest(
     except FileNotFoundError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
-
-
 
 
 @app.command(name="queue-ingest")

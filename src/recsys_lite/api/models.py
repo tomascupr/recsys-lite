@@ -3,6 +3,46 @@
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
+from typing_extensions import TypedDict
+
+
+class FilterInfo(TypedDict, total=False):
+    """Type definition for filter information."""
+
+    original_count: int
+    filtered_count: int
+    filters_applied: Dict[str, Any]
+
+
+class PaginationData(TypedDict):
+    """Type definition for pagination data."""
+
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    has_next: bool
+    has_prev: bool
+
+
+class ItemMetadata(TypedDict, total=False):
+    """Type definition for item metadata."""
+
+    title: Optional[str]
+    category: Optional[str]
+    brand: Optional[str]
+    price: Optional[float]
+    img_url: Optional[str]
+
+
+class ModelInfo(TypedDict, total=False):
+    """Type definition for model information."""
+
+    num_users: int
+    num_items: int
+    num_interactions: int
+    embedding_dim: Optional[int]
+    model_type: str
 
 
 class Recommendation(BaseModel):
@@ -34,7 +74,7 @@ class RecommendationResponse(BaseModel):
     user_id: str
     recommendations: List[Recommendation]
     pagination: Optional[PaginationInfo] = None
-    filter_info: Optional[Dict[str, Any]] = None
+    filter_info: Optional[FilterInfo] = None
 
 
 class FilterOptions(BaseModel):
@@ -57,4 +97,4 @@ class MetricsResponse(BaseModel):
     error_count: int
     recommendations_per_second: float
     model_type: Optional[str] = None
-    model_info: Optional[Dict[str, int]] = None
+    model_info: Optional[ModelInfo] = None

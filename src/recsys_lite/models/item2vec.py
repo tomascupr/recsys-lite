@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 import scipy.sparse as sp
+
 try:
     from gensim.models import Word2Vec
 except ImportError:

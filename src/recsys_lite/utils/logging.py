@@ -3,7 +3,8 @@
 import logging
 import sys
 from enum import Enum
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
+
 
 # Define standard log levels with descriptive names
 class LogLevel(str, Enum):
@@ -53,7 +54,7 @@ def configure_logging(
         log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
     # Configure root logger
-    handlers = []
+    handlers: List[logging.Handler] = []
 
     # Always add console handler
     console_handler = logging.StreamHandler(sys.stdout)
@@ -95,9 +96,9 @@ def get_logger(name: str) -> logging.Logger:
 
 
 def log_exception(
-    logger: logging.Logger, 
-    message: str, 
-    exc: Optional[Exception] = None, 
+    logger: logging.Logger,
+    message: str,
+    exc: Optional[Exception] = None,
     level: LogLevel = LogLevel.ERROR,
     extra: Optional[Dict[str, Any]] = None,
 ) -> None:
@@ -111,7 +112,7 @@ def log_exception(
         extra: Additional context to include in the log
     """
     log_method = getattr(logger, level.lower())
-    
+
     if exc is not None:
         if level == LogLevel.ERROR or level == LogLevel.CRITICAL:
             logger.exception(f"{message}: {exc}", extra=extra)

@@ -1,12 +1,12 @@
 """Error handling for RecSys-Lite API."""
 
-from typing import Callable, Dict, Optional, Type, TypedDict, cast
+from typing import Optional, TypedDict
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from recsys_lite.utils.logging import get_logger, log_exception, LogLevel
+from recsys_lite.utils.logging import LogLevel, get_logger, log_exception
 
 logger = get_logger("api")
 
@@ -99,13 +99,13 @@ class VectorRetrievalError(VectorError):
             reason: Reason for the failure
         """
         detail_parts = [f"Failed to retrieve {entity_type} vector"]
-        
+
         if entity_id:
             detail_parts.append(f"for {entity_id}")
-            
+
         if reason:
             detail_parts.append(f": {reason}")
-            
+
         self.detail = " ".join(detail_parts)
         super().__init__(self.detail)
 
@@ -129,11 +129,11 @@ def add_error_handlers(app: FastAPI) -> None:
             JSON response with error details
         """
         log_exception(
-            logger, 
-            "Validation error", 
-            exc, 
+            logger,
+            "Validation error",
+            exc,
             level=LogLevel.WARNING,
-            extra={"path": request.url.path, "method": request.method}
+            extra={"path": request.url.path, "method": request.method},
         )
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -155,13 +155,13 @@ def add_error_handlers(app: FastAPI) -> None:
         level = LogLevel.ERROR
         if exc.status_code < 500:
             level = LogLevel.WARNING
-            
+
         log_exception(
-            logger, 
-            "API error", 
-            exc, 
+            logger,
+            "API error",
+            exc,
             level=level,
-            extra={"path": request.url.path, "method": request.method, "status_code": exc.status_code}
+            extra={"path": request.url.path, "method": request.method, "status_code": exc.status_code},
         )
         return JSONResponse(
             status_code=exc.status_code,
@@ -180,11 +180,11 @@ def add_error_handlers(app: FastAPI) -> None:
             JSON response with error details
         """
         log_exception(
-            logger, 
-            "Unhandled exception", 
-            exc, 
+            logger,
+            "Unhandled exception",
+            exc,
             level=LogLevel.ERROR,
-            extra={"path": request.url.path, "method": request.method}
+            extra={"path": request.url.path, "method": request.method},
         )
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -197,23 +197,3 @@ class ErrorResponse(TypedDict):
 
     status_code: int
     detail: str
-
-
-def _create_error_response(error: RecSysError) -> ErrorResponse:
-    """Create error response from RecSys error.
-
-    Args:
-        error: RecSys error
-
-    Returns:
-        Error response
-    """
-    return {"status_code": error.status_code, "detail": error.detail}
-
-
-ERROR_TYPES: Dict[Type[Exception], Callable[[Exception], ErrorResponse]] = {
-    UserNotFoundError: lambda e: _create_error_response(cast(RecSysError, e)),
-    ItemNotFoundError: lambda e: _create_error_response(cast(RecSysError, e)),
-    ModelNotInitializedError: lambda e: _create_error_response(cast(RecSysError, e)),
-    VectorRetrievalError: lambda e: _create_error_response(cast(RecSysError, e)),
-}

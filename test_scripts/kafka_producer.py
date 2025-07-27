@@ -2,7 +2,7 @@
 """
 Sample Kafka producer for testing the queue-ingest functionality.
 
-This script sends sample event messages to a Kafka topic for testing 
+This script sends sample event messages to a Kafka topic for testing
 the RecSys-Lite queue-based ingest functionality.
 
 Usage:
@@ -25,8 +25,7 @@ try:
     from kafka import KafkaProducer
 except ImportError as err:
     raise ImportError(
-        "Kafka producer requires kafka-python package. "
-        "Install it with: pip install kafka-python"
+        "Kafka producer requires kafka-python package. Install it with: pip install kafka-python"
     ) from err
 
 
@@ -36,7 +35,7 @@ def send_event_messages(
     message_count: int = 10,
 ) -> None:
     """Send sample event messages to Kafka.
-    
+
     Args:
         bootstrap_servers: Comma-separated list of Kafka broker addresses
         topic: Topic name
@@ -45,13 +44,13 @@ def send_event_messages(
     # Create producer
     producer = KafkaProducer(
         bootstrap_servers=bootstrap_servers,
-        value_serializer=lambda m: json.dumps(m).encode('utf-8'),
+        value_serializer=lambda m: json.dumps(m).encode("utf-8"),
     )
-    
+
     # Sample user and item IDs
     user_ids = [f"user_{i}" for i in range(1, 101)]
     item_ids = [f"item_{i}" for i in range(1, 501)]
-    
+
     # Send messages
     for i in range(message_count):
         # Create a sample event message
@@ -63,13 +62,13 @@ def send_event_messages(
             "session_id": f"session_{random.randint(1000, 9999)}",
             "event_type": "view" if random.random() < 0.7 else "purchase",
         }
-        
+
         # Send message to Kafka
         producer.send(topic, event)
-        
-        print(f"Sent message {i+1}/{message_count}: {event['user_id']} -> {event['item_id']}")
+
+        print(f"Sent message {i + 1}/{message_count}: {event['user_id']} -> {event['item_id']}")
         time.sleep(0.1)  # Small delay between messages
-    
+
     # Flush and close producer
     producer.flush()
     producer.close()
@@ -82,9 +81,9 @@ def main() -> None:
     parser.add_argument("--servers", default="localhost:9092", help="Kafka bootstrap servers")
     parser.add_argument("--topic", default="events", help="Topic name")
     parser.add_argument("--count", type=int, default=10, help="Number of messages to send")
-    
+
     args = parser.parse_args()
-    
+
     try:
         send_event_messages(
             bootstrap_servers=args.servers,

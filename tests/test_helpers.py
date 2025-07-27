@@ -116,9 +116,7 @@ def create_mock_model() -> MagicMock:
     mock = MagicMock()
     # Set up standard model methods
     mock.fit = MagicMock()
-    mock.recommend = MagicMock(
-        return_value=(np.array([1, 2, 3]), np.array([0.9, 0.8, 0.7]))
-    )
+    mock.recommend = MagicMock(return_value=(np.array([1, 2, 3]), np.array([0.9, 0.8, 0.7])))
     mock.save_model = MagicMock()
     mock.load_model = MagicMock()
 

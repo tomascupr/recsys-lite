@@ -24,24 +24,24 @@ def ingest_data(events_path: Path, items_path: Path, db_path: Path) -> None:
         db_path: Path to DuckDB database
     """
     conn = duckdb.connect(str(db_path))
+    try:
+        # Create events table
+        conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS events AS
+            SELECT * FROM read_parquet('{events_path}')
+            """
+        )
 
-    # Create events table
-    conn.execute(
-        f"""
-        CREATE TABLE IF NOT EXISTS events AS
-        SELECT * FROM read_parquet('{events_path}')
-        """
-    )
-
-    # Create items table
-    conn.execute(
-        f"""
-        CREATE TABLE IF NOT EXISTS items AS
-        SELECT * FROM read_csv('{items_path}')
-        """
-    )
-
-    conn.close()
+        # Create items table
+        conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS items AS
+            SELECT * FROM read_csv('{items_path}')
+            """
+        )
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -78,8 +78,8 @@ def stream_events(
     if not events_dir.exists():
         raise FileNotFoundError(f"Events directory '{events_dir}' does not exist")
 
-    logger.info(f"[stream-ingest] Watching '{events_dir}' for parquet files. " "Press Ctrl+C to stop.")
-    print(f"[stream-ingest] Watching '{events_dir}' for parquet files. " "Press Ctrl+C to stop.")
+    logger.info(f"[stream-ingest] Watching '{events_dir}' for parquet files. Press Ctrl+C to stop.")
+    print(f"[stream-ingest] Watching '{events_dir}' for parquet files. Press Ctrl+C to stop.")
 
     try:
         while True:
@@ -108,19 +108,19 @@ def _append_parquet_to_events(parquet_file: Path, db_path: Path) -> None:
     """Helper that appends the content of *parquet_file* into ``events`` table."""
 
     conn = duckdb.connect(str(db_path))
+    try:
+        # Ensure the events table exists – if not, create it on‑the‑fly.
+        conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS events AS
+            SELECT * FROM read_parquet('{parquet_file}') WHERE 0=1
+            """
+        )
 
-    # Ensure the events table exists – if not, create it on‑the‑fly.
-    conn.execute(
-        f"""
-        CREATE TABLE IF NOT EXISTS events AS
-        SELECT * FROM read_parquet('{parquet_file}') WHERE 0=1
-        """
-    )
-
-    # Append the actual data
-    conn.execute(f"INSERT INTO events SELECT * FROM read_parquet('{parquet_file}')")
-
-    conn.close()
+        # Append the actual data
+        conn.execute(f"INSERT INTO events SELECT * FROM read_parquet('{parquet_file}')")
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +185,7 @@ class RabbitMQConsumer(MessageQueueConsumer):
                 raise ImportError("pika package not found")
         except ImportError as err:
             raise ImportError(
-                "RabbitMQ support requires pika package. " "Install it with: pip install recsys-lite[mq]"
+                "RabbitMQ support requires pika package. Install it with: pip install recsys-lite[mq]"
             ) from err
 
         self.host = host
@@ -224,7 +224,7 @@ class RabbitMQConsumer(MessageQueueConsumer):
             logger.info(f"Connected to RabbitMQ at {self.host}:{self.port}, queue: {self.queue}")
         except ImportError as err:
             raise ImportError(
-                "RabbitMQ support requires pika package. " "Install it with: pip install recsys-lite[mq]"
+                "RabbitMQ support requires pika package. Install it with: pip install recsys-lite[mq]"
             ) from err
         except Exception as e:
             logger.error(f"Failed to connect to RabbitMQ: {e}")
@@ -305,7 +305,7 @@ class KafkaConsumer(MessageQueueConsumer):
                 raise ImportError("kafka-python package not found")
         except ImportError as err:
             raise ImportError(
-                "Kafka support requires kafka-python package. " "Install it with: pip install recsys-lite[mq]"
+                "Kafka support requires kafka-python package. Install it with: pip install recsys-lite[mq]"
             ) from err
 
         self.bootstrap_servers = bootstrap_servers
@@ -329,12 +329,10 @@ class KafkaConsumer(MessageQueueConsumer):
                 enable_auto_commit=False,
             )
 
-            logger.info(
-                f"Connected to Kafka at {self.bootstrap_servers}, " f"topic: {self.topic}, group: {self.group_id}"
-            )
+            logger.info(f"Connected to Kafka at {self.bootstrap_servers}, topic: {self.topic}, group: {self.group_id}")
         except ImportError as err:
             raise ImportError(
-                "Kafka support requires kafka-python package. " "Install it with: pip install recsys-lite[mq]"
+                "Kafka support requires kafka-python package. Install it with: pip install recsys-lite[mq]"
             ) from err
         except Exception as e:
             logger.error(f"Failed to connect to Kafka: {e}")
@@ -422,7 +420,6 @@ def process_event_messages(
     total_batches = (total_messages + batch_size - 1) // batch_size
 
     conn = duckdb.connect(str(db_path))
-
     try:
         # Ensure events table exists
         conn.execute(
@@ -490,8 +487,8 @@ def queue_ingest(
         consumer = create_consumer(queue_type, queue_config)
         consumer.connect()
 
-        print(f"[queue-ingest] Connected to {queue_type} queue. " "Processing messages. Press Ctrl+C to stop.")
-        logger.info(f"[queue-ingest] Connected to {queue_type} queue. " "Processing messages.")
+        print(f"[queue-ingest] Connected to {queue_type} queue. Processing messages. Press Ctrl+C to stop.")
+        logger.info(f"[queue-ingest] Connected to {queue_type} queue. Processing messages.")
 
         while True:
             try:

@@ -1,11 +1,13 @@
 """Hyperparameter optimization commands for RecSys-Lite CLI."""
+
 import json
 import os
-import typer
 from pathlib import Path
 
 import duckdb
+import typer
 from scipy.sparse import csr_matrix
+
 try:
     # Lazy import to avoid requiring sklearn for CLI module load
     from sklearn.model_selection import train_test_split
@@ -13,7 +15,8 @@ except ImportError:
     train_test_split = None  # type: ignore
 
 from recsys_lite.cli import app, logger
-from recsys_lite.cli.types import ModelType, MetricType
+from recsys_lite.cli.model import train
+from recsys_lite.cli.types import MetricType, ModelType
 from recsys_lite.models import ModelRegistry
 from recsys_lite.optimization.optimizer import OptunaOptimizer
 
@@ -34,13 +37,17 @@ def optimize(
     output.mkdir(parents=True, exist_ok=True)
     logger.info(f"Loading data from {db}")
     conn = duckdb.connect(str(db))
-    df = conn.execute(
-        """
-        SELECT user_id, item_id, CAST(SUM(qty) AS FLOAT) as interaction
-        FROM events
-        GROUP BY user_id, item_id
-        """
-    ).fetchdf()
+    try:
+        df = conn.execute(
+            """
+            SELECT user_id, item_id, CAST(SUM(qty) AS FLOAT) as interaction
+            FROM events
+            GROUP BY user_id, item_id
+            """
+        ).fetchdf()
+    finally:
+        conn.close()
+
     users = df["user_id"].unique()
     items = df["item_id"].unique()
     user_map = {u: i for i, u in enumerate(users)}
@@ -53,19 +60,55 @@ def optimize(
     user_item_matrix = csr_matrix((data, (rows, cols)), shape=(len(user_map), len(item_map)))
     # Parameter space per model
     if model_type == ModelType.ALS:
-        param_space = {"factors": [32, 64, 128, 256], "regularization": [0.001, 0.01, 0.1, 1.0], "alpha": [0.1, 1.0, 10.0, 40.0], "iterations": [10, 15, 20]}
+        param_space = {
+            "factors": [32, 64, 128, 256],
+            "regularization": [0.001, 0.01, 0.1, 1.0],
+            "alpha": [0.1, 1.0, 10.0, 40.0],
+            "iterations": [10, 15, 20],
+        }
     elif model_type == ModelType.BPR:
-        param_space = {"factors": [32, 64, 100, 128, 200], "learning_rate": [0.01, 0.05, 0.1], "regularization": [0.001, 0.01, 0.1], "iterations": [50, 100, 200]}
+        param_space = {
+            "factors": [32, 64, 100, 128, 200],
+            "learning_rate": [0.01, 0.05, 0.1],
+            "regularization": [0.001, 0.01, 0.1],
+            "iterations": [50, 100, 200],
+        }
     elif model_type == ModelType.ITEM2VEC:
-        param_space = {"vector_size": [32, 64, 100, 128, 200], "window": [3, 5, 10], "min_count": [1, 3, 5], "sg": [0, 1], "epochs": [3, 5, 10]}
+        param_space = {
+            "vector_size": [32, 64, 100, 128, 200],
+            "window": [3, 5, 10],
+            "min_count": [1, 3, 5],
+            "sg": [0, 1],
+            "epochs": [3, 5, 10],
+        }
     elif model_type == ModelType.LIGHTFM:
-        param_space = {"no_components": [32, 64, 128], "learning_rate": [0.01, 0.05, 0.1], "loss": ["warp", "bpr", "logistic"], "epochs": [10, 30, 50]}
+        param_space = {
+            "no_components": [32, 64, 128],
+            "learning_rate": [0.01, 0.05, 0.1],
+            "loss": ["warp", "bpr", "logistic"],
+            "epochs": [10, 30, 50],
+        }
     elif model_type == ModelType.GRU4REC:
-        param_space = {"hidden_size": [50, 100, 200], "n_layers": [1, 2], "dropout": [0.0, 0.1, 0.2, 0.3], "batch_size": [32, 64, 128], "learning_rate": [0.0001, 0.001, 0.01], "n_epochs": [5, 10, 15]}
+        param_space = {
+            "hidden_size": [50, 100, 200],
+            "n_layers": [1, 2],
+            "dropout": [0.0, 0.1, 0.2, 0.3],
+            "batch_size": [32, 64, 128],
+            "learning_rate": [0.0001, 0.001, 0.01],
+            "n_epochs": [5, 10, 15],
+        }
     elif model_type == ModelType.EASE:
         param_space = {"lambda_": [0.1, 0.5, 1.0, 5.0, 10.0]}
     elif model_type == ModelType.TEXT_EMBEDDING:
-        param_space = {"model_name": ["all-MiniLM-L6-v2","all-mpnet-base-v2","paraphrase-multilingual-MiniLM-L12-v2"], "batch_size": [32, 64, 128], "field_weights": [{"title":3.0,"category":1.0,"brand":1.0,"description":2.0},{"title":2.0,"category":1.0,"brand":1.0,"description":3.0},{"title":2.0,"category":1.5,"brand":1.5,"description":2.0}]}
+        param_space = {
+            "model_name": ["all-MiniLM-L6-v2", "all-mpnet-base-v2", "paraphrase-multilingual-MiniLM-L12-v2"],
+            "batch_size": [32, 64, 128],
+            "field_weights": [
+                {"title": 3.0, "category": 1.0, "brand": 1.0, "description": 2.0},
+                {"title": 2.0, "category": 1.0, "brand": 1.0, "description": 3.0},
+                {"title": 2.0, "category": 1.5, "brand": 1.5, "description": 2.0},
+            ],
+        }
     else:
         typer.echo(f"Optimization not supported for {model_type}")
         raise typer.Exit(code=1)
@@ -83,6 +126,7 @@ def optimize(
     logger.info(f"Best parameters saved to {params_file}")
     # Retrain with best params
     import tempfile
+
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as t:
         json.dump(best_params, t)
         temp_path = Path(t.name)

@@ -9,15 +9,13 @@ project_root = Path(__file__).parent.parent  # Get the project root directory
 src_dir = project_root / "src"
 sys.path.insert(0, str(src_dir))
 
+
 # Create markers for tests
 def pytest_configure(config):
     """Configure pytest with custom markers."""
-    config.addinivalue_line(
-        "markers", "requires_deps: mark test as requiring specific dependencies"
-    )
-    config.addinivalue_line(
-        "markers", "slow: mark test as slow running"
-    )
+    config.addinivalue_line("markers", "requires_deps: mark test as requiring specific dependencies")
+    config.addinivalue_line("markers", "slow: mark test as slow running")
+
 
 # Environment detection helpers
 def is_ci_environment():

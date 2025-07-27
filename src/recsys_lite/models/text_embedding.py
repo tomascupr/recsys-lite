@@ -138,7 +138,7 @@ class TextEmbeddingModel(BaseRecommender):
             from sentence_transformers import SentenceTransformer
         except ImportError:
             logger.error(
-                "The sentence-transformers package is required. " "Install with: pip install sentence-transformers"
+                "The sentence-transformers package is required. Install with: pip install sentence-transformers"
             )
             raise
 
@@ -235,7 +235,7 @@ class TextEmbeddingModel(BaseRecommender):
             batch_texts = texts[i : i + self.batch_size]
             batch_size = len(batch_texts)
 
-            logger.debug(f"Processing batch {i//self.batch_size + 1} with {batch_size} items")
+            logger.debug(f"Processing batch {i // self.batch_size + 1} with {batch_size} items")
 
             with torch.no_grad():
                 if self.model is not None:
@@ -428,7 +428,7 @@ class TextEmbeddingModel(BaseRecommender):
                     self.embedding_dim = self.model.get_sentence_embedding_dimension()
             except ImportError:
                 logger.error(
-                    "The sentence-transformers package is required. " "Install with: pip install sentence-transformers"
+                    "The sentence-transformers package is required. Install with: pip install sentence-transformers"
                 )
                 raise
 

@@ -244,7 +244,7 @@ class GRU4Rec(BaseRecommender):
             avg_loss = epoch_loss / len(dataloader)
             metrics["loss"].append(avg_loss)
 
-            print(f"Epoch {epoch+1}/{self.n_epochs}, Loss: {avg_loss:.4f}")
+            print(f"Epoch {epoch + 1}/{self.n_epochs}, Loss: {avg_loss:.4f}")
 
         return metrics
 

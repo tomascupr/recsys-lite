@@ -16,6 +16,7 @@ def test_health():
     print(f"Health endpoint: {response.status_code}")
     print(response.json())
 
+
 def test_recommend():
     """Test the recommend endpoint."""
     try:
@@ -27,6 +28,7 @@ def test_recommend():
         print(response.json())
     else:
         print(f"Error: {response.text}")
+
 
 if __name__ == "__main__":
     print("Running acceptance tests...")

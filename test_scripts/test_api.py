@@ -87,9 +87,7 @@ model.save_model(str(model_dir))
 # Create and save a Faiss index
 print("Creating Faiss index...")
 item_vectors = model.get_item_factors()
-index_builder = FaissIndexBuilder(
-    vectors=item_vectors, ids=list(item_mapping.keys()), index_type="Flat"
-)
+index_builder = FaissIndexBuilder(vectors=item_vectors, ids=list(item_mapping.keys()), index_type="Flat")
 index_builder.save(str(model_dir / "faiss_index"))
 print("Faiss index saved")
 
@@ -119,7 +117,6 @@ state.model_type = service.model_type
 state.user_mapping = service.user_mapping
 state.item_mapping = service.item_mapping
 with TestClient(app) as client:
-
     # Test health endpoint
     print("Testing /health endpoint...")
     response = client.get("/health")

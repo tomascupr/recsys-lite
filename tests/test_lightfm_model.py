@@ -13,9 +13,7 @@ from recsys_lite.models.lightfm_mock import LightFMModel
 
 # Skip in CI environment
 is_ci = os.environ.get("CI", "false").lower() == "true"
-pytestmark = pytest.mark.skipif(
-    is_ci, reason="Tests with heavy dependencies don't run in CI environment"
-)
+pytestmark = pytest.mark.skipif(is_ci, reason="Tests with heavy dependencies don't run in CI environment")
 
 
 @pytest.fixture

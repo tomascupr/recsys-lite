@@ -34,7 +34,15 @@ def get_recommendation_service(state: APIState = Depends(get_api_state)) -> Reco
     """
     if not hasattr(state, "recommendation_service") or state.recommendation_service is None:
         raise RuntimeError("Recommendation service not initialized")
-    return cast(RecommendationService, state.recommendation_service)
+
+    # Ensure the recommendation service has the latest cache manager
+    service = cast(RecommendationService, state.recommendation_service)
+    if hasattr(state, "cache_manager") and service.cache_manager != state.cache_manager:
+        service.cache_manager = state.cache_manager
+        service.vector_retrieval_service.cache_manager = state.cache_manager
+        service.recommendation_engine.vector_retrieval_service.cache_manager = state.cache_manager
+
+    return service
 
 
 def get_stats(state: APIState = Depends(get_api_state)) -> Dict[str, Any]:

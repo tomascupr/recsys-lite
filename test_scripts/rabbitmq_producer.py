@@ -2,7 +2,7 @@
 """
 Sample RabbitMQ producer for testing the queue-ingest functionality.
 
-This script sends sample event messages to a RabbitMQ queue for testing 
+This script sends sample event messages to a RabbitMQ queue for testing
 the RecSys-Lite queue-based ingest functionality.
 
 Usage:
@@ -25,10 +25,7 @@ from typing import Any, Dict
 try:
     import pika
 except ImportError as err:
-    raise ImportError(
-        "RabbitMQ producer requires pika package. "
-        "Install it with: pip install pika"
-    ) from err
+    raise ImportError("RabbitMQ producer requires pika package. Install it with: pip install pika") from err
 
 
 def send_event_messages(
@@ -40,7 +37,7 @@ def send_event_messages(
     message_count: int = 10,
 ) -> None:
     """Send sample event messages to RabbitMQ.
-    
+
     Args:
         host: RabbitMQ host
         port: RabbitMQ port
@@ -56,18 +53,18 @@ def send_event_messages(
         port=port,
         credentials=credentials,
     )
-    
+
     # Establish connection
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
-    
+
     # Declare the queue
     channel.queue_declare(queue=queue, durable=True)
-    
+
     # Sample user and item IDs
     user_ids = [f"user_{i}" for i in range(1, 101)]
     item_ids = [f"item_{i}" for i in range(1, 501)]
-    
+
     # Send messages
     for i in range(message_count):
         # Create a sample event message
@@ -79,7 +76,7 @@ def send_event_messages(
             "session_id": f"session_{random.randint(1000, 9999)}",
             "event_type": "view" if random.random() < 0.7 else "purchase",
         }
-        
+
         # Convert to JSON and publish
         message_body = json.dumps(event)
         channel.basic_publish(
@@ -90,10 +87,10 @@ def send_event_messages(
                 delivery_mode=2,  # make message persistent
             ),
         )
-        
-        print(f"Sent message {i+1}/{message_count}: {event['user_id']} -> {event['item_id']}")
+
+        print(f"Sent message {i + 1}/{message_count}: {event['user_id']} -> {event['item_id']}")
         time.sleep(0.1)  # Small delay between messages
-    
+
     # Close connection
     connection.close()
     print(f"Successfully sent {message_count} messages to {queue} queue")
@@ -106,9 +103,9 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=5672, help="RabbitMQ port")
     parser.add_argument("--queue", default="events", help="Queue name")
     parser.add_argument("--count", type=int, default=10, help="Number of messages to send")
-    
+
     args = parser.parse_args()
-    
+
     try:
         send_event_messages(
             host=args.host,

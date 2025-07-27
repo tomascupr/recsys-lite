@@ -10,9 +10,7 @@ import pytest
 
 # Skip tests in CI environment due to dependency issues
 is_ci = os.environ.get("CI", "false").lower() == "true"
-pytestmark = pytest.mark.skipif(
-    is_ci, reason="Tests don't run in CI environment due to dependency issues"
-)
+pytestmark = pytest.mark.skipif(is_ci, reason="Tests don't run in CI environment due to dependency issues")
 
 from recsys_lite.ingest import ingest_data
 

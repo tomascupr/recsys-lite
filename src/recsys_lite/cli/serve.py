@@ -1,5 +1,7 @@
 """Serving and update worker commands for RecSys-Lite CLI."""
+
 from pathlib import Path
+
 import typer
 
 from recsys_lite.cli import app
@@ -15,6 +17,7 @@ def serve(
 ) -> None:
     """Start the recommendation API server."""
     import uvicorn
+
     from recsys_lite.api.main import create_app
 
     if not model_dir.exists():
@@ -34,7 +37,7 @@ def worker(
     incremental_dir: Path = typer.Option(None, help="Directory to watch for incremental data"),
 ) -> None:
     """Start the update worker for incremental model updates."""
-    from recsys_lite.api.loaders import load_model, load_faiss_index
+    from recsys_lite.api.loaders import load_faiss_index, load_model
     from recsys_lite.update.worker import UpdateWorker
 
     if not model_dir.exists():
@@ -47,6 +50,7 @@ def worker(
     model, model_type = load_model(Path(model_dir))
     faiss_index = load_faiss_index(Path(model_dir))
     import json
+
     item_map = json.loads((model_dir / "item_mapping.json").read_text())
     reverse_map = {int(v): k for k, v in item_map.items()}
 

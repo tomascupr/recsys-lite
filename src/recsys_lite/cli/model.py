@@ -1,6 +1,6 @@
 """Model training commands for RecSys-Lite CLI."""
+
 import json
-import logging
 from pathlib import Path
 from typing import Optional
 
@@ -10,8 +10,8 @@ from scipy.sparse import csr_matrix
 
 from recsys_lite.cli import app, logger
 from recsys_lite.cli.types import ModelType
-from recsys_lite.models import ModelRegistry
 from recsys_lite.indexing import FaissIndexBuilder
+from recsys_lite.models import ModelRegistry
 
 
 @app.command()
@@ -29,14 +29,18 @@ def train(
     output.mkdir(parents=True, exist_ok=True)
     logger.info(f"Loading data from {db}")
     conn = duckdb.connect(str(db))
-    user_item_df = conn.execute(
-        """
-        SELECT user_id, item_id, CAST(SUM(qty) AS FLOAT) as interaction
-        FROM events
-        GROUP BY user_id, item_id
-        """
-    ).fetchdf()
-    item_df = conn.execute("SELECT * FROM items").fetchdf()
+    try:
+        user_item_df = conn.execute(
+            """
+            SELECT user_id, item_id, CAST(SUM(qty) AS FLOAT) as interaction
+            FROM events
+            GROUP BY user_id, item_id
+            """
+        ).fetchdf()
+        item_df = conn.execute("SELECT * FROM items").fetchdf()
+    finally:
+        conn.close()
+
     logger.info("Creating user and item mappings")
     unique_users = user_item_df["user_id"].unique()
     unique_items = user_item_df["item_id"].unique()
@@ -60,43 +64,57 @@ def train(
     model_class = ModelRegistry.get_model_class(model_type.value)
     # Prepare default params per model
     if model_type == ModelType.ALS:
-        model_params = {"factors": params.get("factors", 128),
-                        "regularization": params.get("regularization", 0.01),
-                        "alpha": params.get("alpha", 1.0),
-                        "iterations": params.get("iterations", 15)}
+        model_params = {
+            "factors": params.get("factors", 128),
+            "regularization": params.get("regularization", 0.01),
+            "alpha": params.get("alpha", 1.0),
+            "iterations": params.get("iterations", 15),
+        }
     elif model_type == ModelType.BPR:
-        model_params = {"factors": params.get("factors", 100),
-                        "learning_rate": params.get("learning_rate", 0.05),
-                        "regularization": params.get("regularization", 0.01),
-                        "iterations": params.get("iterations", 100)}
+        model_params = {
+            "factors": params.get("factors", 100),
+            "learning_rate": params.get("learning_rate", 0.05),
+            "regularization": params.get("regularization", 0.01),
+            "iterations": params.get("iterations", 100),
+        }
     elif model_type == ModelType.ITEM2VEC:
-        model_params = {"vector_size": params.get("vector_size", 100),
-                        "window": params.get("window", 5),
-                        "min_count": params.get("min_count", 5),
-                        "sg": params.get("sg", 1),
-                        "epochs": params.get("epochs", 5)}
+        model_params = {
+            "vector_size": params.get("vector_size", 100),
+            "window": params.get("window", 5),
+            "min_count": params.get("min_count", 5),
+            "sg": params.get("sg", 1),
+            "epochs": params.get("epochs", 5),
+        }
     elif model_type == ModelType.LIGHTFM:
-        model_params = {"no_components": params.get("no_components", 64),
-                        "learning_rate": params.get("learning_rate", 0.05),
-                        "loss": params.get("loss", "warp"),
-                        "epochs": params.get("epochs", 50)}
+        model_params = {
+            "no_components": params.get("no_components", 64),
+            "learning_rate": params.get("learning_rate", 0.05),
+            "loss": params.get("loss", "warp"),
+            "epochs": params.get("epochs", 50),
+        }
     elif model_type == ModelType.GRU4REC:
-        model_params = {"n_items": len(item_mapping),
-                        "hidden_size": params.get("hidden_size", 100),
-                        "n_layers": params.get("n_layers", 1),
-                        "dropout": params.get("dropout", 0.1),
-                        "batch_size": params.get("batch_size", 64),
-                        "learning_rate": params.get("learning_rate", 0.001),
-                        "n_epochs": params.get("n_epochs", 10)}
+        model_params = {
+            "n_items": len(item_mapping),
+            "hidden_size": params.get("hidden_size", 100),
+            "n_layers": params.get("n_layers", 1),
+            "dropout": params.get("dropout", 0.1),
+            "batch_size": params.get("batch_size", 64),
+            "learning_rate": params.get("learning_rate", 0.001),
+            "n_epochs": params.get("n_epochs", 10),
+        }
     elif model_type == ModelType.EASE:
         model_params = {"lambda_": params.get("lambda_", 0.5)}
     elif model_type == ModelType.TEXT_EMBEDDING:
-        model_params = {"model_name": params.get("model_name", "all-MiniLM-L6-v2"),
-                        "item_text_fields": params.get("item_text_fields", ["title", "category", "brand", "description"]),
-                        "field_weights": params.get("field_weights", {"title":2.0, "category":1.0, "brand":1.0, "description":3.0}),
-                        "normalize_vectors": params.get("normalize_vectors", True),
-                        "batch_size": params.get("batch_size", 64),
-                        "max_length": params.get("max_length", 512)}
+        model_params = {
+            "model_name": params.get("model_name", "all-MiniLM-L6-v2"),
+            "item_text_fields": params.get("item_text_fields", ["title", "category", "brand", "description"]),
+            "field_weights": params.get(
+                "field_weights", {"title": 2.0, "category": 1.0, "brand": 1.0, "description": 3.0}
+            ),
+            "normalize_vectors": params.get("normalize_vectors", True),
+            "batch_size": params.get("batch_size", 64),
+            "max_length": params.get("max_length", 512),
+        }
     else:
         typer.echo(f"Unknown model type: {model_type}")
         raise typer.Exit(code=1)
@@ -124,6 +142,7 @@ def train(
         item_vectors = model.get_item_factors()
     else:
         import numpy as _np
+
         size = getattr(model, "factors", 100)
         item_vectors = _np.random.random((len(item_mapping), size)).astype(_np.float32)
     index_builder = FaissIndexBuilder(vectors=item_vectors, ids=list(range(len(item_mapping))))
@@ -146,6 +165,7 @@ def train_hybrid(
     output.mkdir(parents=True, exist_ok=True)
     logger.info(f"Loading {len(models_dir)} component models")
     from recsys_lite.models import ModelRegistry
+
     models = []
     types = []
     for model_dir in models_dir:
@@ -169,20 +189,27 @@ def train_hybrid(
     else:
         ws = None
     from recsys_lite.models import HybridModel
-    hybrid = HybridModel(models=models, weights=ws, dynamic_weighting=dynamic,
-                         cold_start_threshold=cold_start_threshold,
-                         cold_start_strategy=cold_start_strategy)
+
+    hybrid = HybridModel(
+        models=models,
+        weights=ws,
+        dynamic_weighting=dynamic,
+        cold_start_threshold=cold_start_threshold,
+        cold_start_strategy=cold_start_strategy,
+    )
     logger.info(f"Saving hybrid model to {output}")
     hybrid.save_model(str(output))
     # Copy mappings
     for f in ["user_mapping.json", "item_mapping.json"]:
         src = models_dir[0] / f
         if src.exists():
-            import shutil; shutil.copy(src, output / f)
+            import shutil
+
+            shutil.copy(src, output / f)
     logger.info("Building Faiss index for hybrid model")
     import json as _json
+
     item_map = _json.loads((output / "item_mapping.json").read_text())
-    id_map = {int(v): k for k, v in item_map.items()}
     if hasattr(hybrid, "get_item_vectors"):
         item_ids = list(item_map.values())
         vectors = hybrid.get_item_vectors(item_ids)
@@ -190,6 +217,7 @@ def train_hybrid(
         vectors = hybrid.get_item_factors()
     else:
         import numpy as _np
+
         sz = getattr(hybrid, "factors", 100)
         vectors = _np.random.random((len(item_map), sz)).astype(_np.float32)
     FaissIndexBuilder(vectors=vectors, ids=list(range(len(item_map)))).save(str(output / "faiss_index"))

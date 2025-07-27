@@ -10,6 +10,12 @@ import numpy as np
 import scipy.sparse as sp
 from numpy.typing import NDArray
 
+from recsys_lite.api.validation import validate_batch_size, validate_interval
+from recsys_lite.utils.logging import get_logger
+
+# Create module-level logger
+logger = get_logger(__name__)
+
 
 class UpdateWorker:
     """Worker for incremental model updates."""
@@ -33,6 +39,10 @@ class UpdateWorker:
             batch_size: Maximum number of events to process per batch
             interval: Update interval in seconds
         """
+        # Validate input parameters
+        batch_size = validate_batch_size(batch_size)
+        interval = validate_interval(interval)
+
         self.db_path = db_path
         self.model = model
         self.faiss_index = faiss_index
@@ -60,7 +70,7 @@ class UpdateWorker:
                 time.sleep(self.interval)
 
             except Exception as e:
-                print(f"Error in update worker: {e}")
+                logger.error(f"Error in update worker: {e}", exc_info=True)
                 time.sleep(self.interval)
 
     def _get_new_events(self) -> Tuple[sp.csr_matrix, NDArray[np.int_], List[str]]:
@@ -70,48 +80,48 @@ class UpdateWorker:
             Tuple of user-item matrix, user IDs, and new items
         """
         conn = duckdb.connect(str(self.db_path))
+        try:
+            # Get events since last timestamp from database
+            events_df = conn.execute(
+                f"""
+                SELECT user_id, item_id, qty, ts
+                FROM events
+                WHERE ts > {self.last_timestamp}
+                ORDER BY ts
+                LIMIT {self.batch_size}
+                """
+            ).fetchdf()
 
-        # Get events since last timestamp from database
-        events_df = conn.execute(
-            f"""
-            SELECT user_id, item_id, qty, ts
-            FROM events
-            WHERE ts > {self.last_timestamp}
-            ORDER BY ts
-            LIMIT {self.batch_size}
-            """
-        ).fetchdf()
+            # Also check for new incremental parquet files in data/incremental directory
+            incremental_dir = Path(self.db_path).parent / "incremental"
+            if incremental_dir.exists():
+                for parquet_file in incremental_dir.glob("*.parquet"):
+                    # Only process files that haven't been processed yet
+                    file_modified_time = parquet_file.stat().st_mtime
+                    if file_modified_time > self.last_timestamp:
+                        # Load and append new events
+                        try:
+                            new_events = conn.execute(
+                                f"""
+                                SELECT user_id, item_id, qty, ts
+                                FROM read_parquet('{parquet_file}')
+                                WHERE ts > {self.last_timestamp}
+                                ORDER BY ts
+                                LIMIT {self.batch_size}
+                                """
+                            ).fetchdf()
 
-        # Also check for new incremental parquet files in data/incremental directory
-        incremental_dir = Path(self.db_path).parent / "incremental"
-        if incremental_dir.exists():
-            for parquet_file in incremental_dir.glob("*.parquet"):
-                # Only process files that haven't been processed yet
-                file_modified_time = parquet_file.stat().st_mtime
-                if file_modified_time > self.last_timestamp:
-                    # Load and append new events
-                    try:
-                        new_events = conn.execute(
-                            f"""
-                            SELECT user_id, item_id, qty, ts
-                            FROM read_parquet('{parquet_file}')
-                            WHERE ts > {self.last_timestamp}
-                            ORDER BY ts
-                            LIMIT {self.batch_size}
-                            """
-                        ).fetchdf()
+                            if not new_events.empty:
+                                # Append to existing events
+                                events_df = events_df.append(new_events)
+                        except Exception as e:
+                            logger.error(f"Error reading incremental parquet file {parquet_file}: {e}", exc_info=True)
 
-                        if not new_events.empty:
-                            # Append to existing events
-                            events_df = events_df.append(new_events)
-                    except Exception as e:
-                        print(f"Error reading incremental parquet file {parquet_file}: {e}")
-
-        # Update last timestamp
-        if not events_df.empty:
-            self.last_timestamp = events_df["ts"].max()
-
-        conn.close()
+            # Update last timestamp
+            if not events_df.empty:
+                self.last_timestamp = events_df["ts"].max()
+        finally:
+            conn.close()
 
         if events_df.empty:
             return sp.csr_matrix((0, 0)), np.array([]), []
@@ -164,7 +174,7 @@ class UpdateWorker:
         if not new_items:
             return
 
-        print(f"Updating item vectors for {len(new_items)} new items")
+        logger.info(f"Updating item vectors for {len(new_items)} new items")
 
         try:
             # Different models use different methods to get item vectors
@@ -177,7 +187,7 @@ class UpdateWorker:
                 # Need to filter to just the new items - this requires model-specific implementation
                 # For simplicity, we're assuming item_vectors is already the right shape
             else:
-                print("Warning: Model does not provide a method to get item vectors")
+                logger.warning("Model does not provide a method to get item vectors")
                 return
 
             # Add to Faiss index
@@ -189,9 +199,9 @@ class UpdateWorker:
                 for i, item_id in enumerate(new_items):
                     self.item_id_map[start_idx + i] = item_id
 
-                print(f"Successfully added {len(new_items)} new items to the Faiss index")
+                logger.info(f"Successfully added {len(new_items)} new items to the Faiss index")
             else:
-                print("No item vectors available to add")
+                logger.warning("No item vectors available to add")
         except Exception as e:
-            print(f"Error updating item vectors: {e}")
+            logger.error(f"Error updating item vectors: {e}", exc_info=True)
             # Continue with worker instead of crashing

@@ -115,9 +115,7 @@ print("Model trained")
 # Create a Faiss index
 print("Creating Faiss index...")
 item_vectors = model.get_item_factors()
-index_builder = FaissIndexBuilder(
-    vectors=item_vectors, ids=list(item_mapping.keys()), index_type="Flat"
-)
+index_builder = FaissIndexBuilder(vectors=item_vectors, ids=list(item_mapping.keys()), index_type="Flat")
 print("Faiss index created")
 
 # Test the UpdateWorker

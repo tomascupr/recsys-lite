@@ -48,7 +48,6 @@ class MockFaissIndex:
         return True
 
 
-
 # Initialize the UpdateWorker class we imported
 
 print("Testing UpdateWorker initialization...")

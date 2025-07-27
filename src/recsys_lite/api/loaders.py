@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional, Tuple, cast
 import scipy.sparse as sp
 
 from recsys_lite.api.services import RecommendationService
+from recsys_lite.cache import CacheConfig, CacheManager
 from recsys_lite.indexing import FaissIndexBuilder
 from recsys_lite.models.base import BaseRecommender, ModelRegistry
 
@@ -131,12 +132,15 @@ def load_item_data(data_dir: Path) -> Dict[str, Dict[str, Any]]:
     return {}
 
 
-def setup_recommendation_service(model_dir: Path, data_dir: Optional[Path] = None) -> RecommendationService:
+def setup_recommendation_service(
+    model_dir: Path, data_dir: Optional[Path] = None, cache_config: Optional[CacheConfig] = None
+) -> RecommendationService:
     """Set up recommendation service.
 
     Args:
         model_dir: Path to model directory
         data_dir: Path to data directory
+        cache_config: Cache configuration
 
     Returns:
         Recommendation service
@@ -153,6 +157,14 @@ def setup_recommendation_service(model_dir: Path, data_dir: Optional[Path] = Non
     # Create empty user-item matrix for tracking interactions
     user_item_matrix = sp.csr_matrix((len(user_mapping), len(item_mapping)))
 
+    # Create cache manager
+    if cache_config is None:
+        cache_config = CacheConfig()
+    cache_manager = CacheManager(cache_config)
+
+    # Generate model version based on model directory timestamp
+    model_version = str(int(model_path.stat().st_mtime))
+
     # Create and return recommendation service
     return RecommendationService(
         model=model,
@@ -162,4 +174,6 @@ def setup_recommendation_service(model_dir: Path, data_dir: Optional[Path] = Non
         item_mapping=item_mapping,
         reverse_item_mapping=reverse_item_mapping,
         user_item_matrix=user_item_matrix,
+        cache_manager=cache_manager,
+        model_version=model_version,
     )

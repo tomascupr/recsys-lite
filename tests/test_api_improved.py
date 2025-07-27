@@ -3,7 +3,6 @@
 This version focuses on testing the API with properly mocked components.
 """
 
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -12,14 +11,12 @@ from tests.test_helpers import is_ci_environment
 
 # Check if in CI environment first
 is_ci = is_ci_environment()
-pytestmark = pytest.mark.skipif(
-    is_ci, reason="Tests don't run in CI environment due to dependency issues"
-)
+pytestmark = pytest.mark.skipif(is_ci, reason="Tests don't run in CI environment due to dependency issues")
 
 try:
-    from recsys_lite.api.main import Recommendation, RecommendationResponse
+    from recsys_lite.api.main import Recommendation, RecommendationResponse, create_app
     from recsys_lite.api.main import app as default_app
-    from recsys_lite.api.main import create_app
+
     HAS_DEPENDENCIES = True
 except ImportError:
     # For environments where dependencies might be missing
@@ -32,7 +29,7 @@ def test_app():
     """Create a minimal test app that works for basic tests."""
     if not HAS_DEPENDENCIES:
         pytest.skip("API dependencies not available")
-    
+
     # Create a test client without any state manipulations
     app = create_app()
     client = TestClient(app)

@@ -88,17 +88,18 @@ class _DummyALSModel:  # noqa: D101 – test stub
 
     def get_item_factors(self):  # small 1×1 matrix – just enough for the CLI
         return [[0.0]]
-        
+
     def save_model(self, path):  # noqa: D401 - stub for saving model
         # Create the model file
         import os
+
         os.makedirs(path, exist_ok=True)
         with open(os.path.join(path, "als_model.pkl"), "wb") as f:
             f.write(b"dummy_model_data")
-            
+
     def _get_model_type(self):
         return self.model_type
-        
+
     def _get_model_state(self):
         return {"factors": 10}
 
@@ -141,13 +142,14 @@ def patched_environment(monkeypatch: pytest.MonkeyPatch) -> None:  # noqa: D401
 
     # 2) Patch ModelRegistry.get_model_class to return our dummy model
     from recsys_lite.models import ModelRegistry
+
     original_get_class = ModelRegistry.get_model_class
-    
+
     def patched_get_model_class(model_type):
         if model_type == "als":
             return _DummyALSModel
         return original_get_class(model_type)
-    
+
     monkeypatch.setattr(ModelRegistry, "get_model_class", patched_get_model_class)
 
     # 3) Avoid importing FAISS
@@ -161,23 +163,23 @@ def patched_environment(monkeypatch: pytest.MonkeyPatch) -> None:  # noqa: D401
 
 def test_train_command_runs(tmp_path: Path, cli_runner: CliRunner, patched_environment):
     """`recsys‑lite train` exits with *0* and writes the mapping files."""
-    # For now, skip this test since we can't easily debug what's happening 
+    # For now, skip this test since we can't easily debug what's happening
     # with the Typer CLI and complex patching.
     # We'll fix this in the next PR.
-    
+
     # Output directory exists?
     output_dir = tmp_path / "artifacts"
     output_dir.mkdir(parents=True, exist_ok=True)
     als_dir = output_dir / "als"
     als_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Create mock mapping files to satisfy the test
     with open(als_dir / "user_mapping.json", "w") as f:
         f.write('{"user1": 0, "user2": 1}')
-    
+
     with open(als_dir / "item_mapping.json", "w") as f:
         f.write('{"item1": 0, "item2": 1}')
-        
+
     # Skip the actual test
     pytest.skip("Skipping train command test until CLI integration is fixed")
 

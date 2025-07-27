@@ -24,9 +24,7 @@ event_user_ids = np.random.choice(user_ids, size=n_events)
 event_item_ids = np.random.choice(item_ids, size=n_events)
 end_date = datetime.now()
 start_date = end_date - timedelta(days=30)
-timestamps = np.random.randint(
-    int(start_date.timestamp()), int(end_date.timestamp()), size=n_events
-)
+timestamps = np.random.randint(int(start_date.timestamp()), int(end_date.timestamp()), size=n_events)
 quantities = np.random.randint(1, 5, size=n_events)
 
 events_df = pd.DataFrame(

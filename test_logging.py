@@ -1,7 +1,8 @@
 """Simple test for the logging module."""
 
 import unittest
-from recsys_lite.utils.logging import get_logger, LogLevel, configure_logging
+
+from recsys_lite.utils.logging import LogLevel, configure_logging, get_logger
 
 
 class TestLogging(unittest.TestCase):
@@ -12,11 +13,11 @@ class TestLogging(unittest.TestCase):
         # Test with a simple name
         logger = get_logger("test")
         self.assertEqual(logger.name, "recsys-lite.test")
-        
+
         # Test with a name that already has the prefix
         logger = get_logger("recsys-lite.test")
         self.assertEqual(logger.name, "recsys-lite.test")
-        
+
         # Test with __main__
         logger = get_logger("__main__")
         self.assertEqual(logger.name, "recsys-lite")
@@ -33,6 +34,6 @@ class TestLogging(unittest.TestCase):
 if __name__ == "__main__":
     # Configure logging
     configure_logging(level=LogLevel.DEBUG)
-    
+
     # Run the tests
     unittest.main()

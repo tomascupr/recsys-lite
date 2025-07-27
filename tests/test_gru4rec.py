@@ -12,9 +12,7 @@ from recsys_lite.models.gru4rec_mock import GRU4Rec
 
 # Skip in CI environment
 is_ci = os.environ.get("CI", "false").lower() == "true"
-pytestmark = pytest.mark.skipif(
-    is_ci, reason="Tests with heavy dependencies don't run in CI environment"
-)
+pytestmark = pytest.mark.skipif(is_ci, reason="Tests with heavy dependencies don't run in CI environment")
 
 
 @pytest.fixture
@@ -90,9 +88,7 @@ def test_gru4rec_recommend(sample_data):
     session = [0, 1]  # Some item IDs to use as a session
 
     # Call recommend method
-    items, scores = model.recommend(
-        user_id=0, user_items=user_items, n_items=3, session=session
-    )
+    items, scores = model.recommend(user_id=0, user_items=user_items, n_items=3, session=session)
 
     # Check results
     assert len(items) == 3
@@ -113,9 +109,7 @@ def test_gru4rec_save_load(sample_data):
         # Save original parameters
         original_n_items = model.n_items
         original_hidden_size = model.hidden_size
-        original_embeddings = (
-            model.item_embeddings.copy() if model.item_embeddings is not None else None
-        )
+        original_embeddings = model.item_embeddings.copy() if model.item_embeddings is not None else None
 
         # Save model
         model.save_model(temp_file.name)

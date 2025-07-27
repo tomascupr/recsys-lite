@@ -10,9 +10,7 @@ from recsys_lite.models import ALSModel, BPRModel, Item2VecModel, LightFMModel
 
 # Skip tests that require heavy dependencies in CI environment
 is_ci = os.environ.get("CI", "false").lower() == "true"
-pytestmark = pytest.mark.skipif(
-    is_ci, reason="Tests don't run in CI environment due to dependency issues"
-)
+pytestmark = pytest.mark.skipif(is_ci, reason="Tests don't run in CI environment due to dependency issues")
 
 
 @pytest.fixture
@@ -119,7 +117,7 @@ def test_item2vec_model(sample_data):
     for session in sessions:
         # Convert to strings since Item2Vec works with string IDs
         formatted_sessions.append([str(item) for item in session])
-        
+
     # Fit model
     if formatted_sessions:
         model.fit(formatted_sessions)
@@ -138,11 +136,7 @@ def test_item2vec_model(sample_data):
     assert isinstance(item_vectors, np.ndarray)
 
     # Test get_item_vectors_matrix
-    item_ids = (
-        list(model.item_vectors.keys())[:3]
-        if len(model.item_vectors) >= 3
-        else list(model.item_vectors.keys())
-    )
+    item_ids = list(model.item_vectors.keys())[:3] if len(model.item_vectors) >= 3 else list(model.item_vectors.keys())
     matrix = model.get_item_vectors_matrix(item_ids)
     assert matrix.shape == (len(item_ids), 10)
 

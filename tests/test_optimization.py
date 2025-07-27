@@ -10,9 +10,7 @@ import scipy.sparse as sp
 
 # Skip tests in CI environment due to dependency issues
 is_ci = os.environ.get("CI", "false").lower() == "true"
-pytestmark = pytest.mark.skipif(
-    is_ci, reason="Tests don't run in CI environment due to dependency issues"
-)
+pytestmark = pytest.mark.skipif(is_ci, reason="Tests don't run in CI environment due to dependency issues")
 
 from recsys_lite.optimization import OptunaOptimizer
 
@@ -48,11 +46,11 @@ class MockModel:
         # Convert user_id to int if needed
         if isinstance(user_id, str):
             # Handle user IDs with 'U_' prefix by removing the prefix
-            if user_id.startswith('U_'):
+            if user_id.startswith("U_"):
                 user_id = int(user_id[2:])
             else:
                 user_id = int(user_id)
-            
+
         user_vector = self.user_factors[user_id]
 
         # Calculate scores
