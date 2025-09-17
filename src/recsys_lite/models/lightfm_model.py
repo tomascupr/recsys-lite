@@ -2,7 +2,7 @@
 
 import os
 import pickle
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Mapping, Optional, Tuple, Union
 
 import numpy as np
 import scipy.sparse as sp
@@ -50,6 +50,8 @@ class LightFMModel(BaseRecommender):
         self.item_embeddings = None
         self.user_features = None
         self.item_features = None
+        self._user_mapping: Optional[Mapping[Union[int, str], int]] = None
+        self._item_mapping: Optional[Mapping[Union[int, str], int]] = None
 
     def fit(self, user_item_matrix: sp.csr_matrix, **kwargs: Any) -> None:
         """Fit the LightFM model.
@@ -65,6 +67,8 @@ class LightFMModel(BaseRecommender):
         # Store features for later use
         self.user_features = user_features
         self.item_features = item_features
+        self._user_mapping = kwargs.get("user_mapping", self._user_mapping)
+        self._item_mapping = kwargs.get("item_mapping", self._item_mapping)
 
         self.model.fit(
             interactions=user_item_matrix,
@@ -125,9 +129,7 @@ class LightFMModel(BaseRecommender):
         Returns:
             Tuple of (item_ids, scores)
         """
-        # Convert string user_id to int if needed
-        if isinstance(user_id, str):
-            user_id = int(user_id)
+        user_idx = self._resolve_user_index(user_id, kwargs.get("user_mapping"))
 
         # Get user and item features from kwargs or use stored ones
         user_features = kwargs.get("user_features", self.user_features)
@@ -137,8 +139,12 @@ class LightFMModel(BaseRecommender):
         filter_items = kwargs.get("filter_items", None)
         if filter_items is None and user_items is not None:
             # Get indices of items the user has already interacted with
-            if user_id < user_items.shape[0]:
-                filter_items = user_items[user_id].indices
+            if not sp.isspmatrix_csr(user_items):
+                user_items = sp.csr_matrix(user_items)
+            if user_items.shape[0] == 1:
+                filter_items = user_items.indices
+            elif user_idx < user_items.shape[0]:
+                filter_items = user_items.getrow(user_idx).indices
 
         # Get number of items
         if self.item_embeddings is None:
@@ -148,7 +154,7 @@ class LightFMModel(BaseRecommender):
 
         # Get predictions for all items
         scores = self.predict(
-            user_ids=np.array([user_id] * n_items_total),
+            user_ids=np.full(n_items_total, user_idx, dtype=np.int32),
             item_ids=np.arange(n_items_total),
             user_features=user_features,
             item_features=item_features,
@@ -162,7 +168,14 @@ class LightFMModel(BaseRecommender):
         top_items = np.argsort(-scores)[:n_items]
         top_scores = scores[top_items]
 
-        return top_items, top_scores
+        valid_mask = np.isfinite(top_scores)
+        if not np.any(valid_mask):
+            return np.array([], dtype=np.int_), np.array([], dtype=np.float32)
+
+        top_items = top_items[valid_mask]
+        top_scores = top_scores[valid_mask]
+
+        return top_items.astype(np.int_), top_scores.astype(np.float32)
 
     def get_item_factors(self) -> FloatArray:
         """Get item factors matrix.
@@ -232,6 +245,8 @@ class LightFMModel(BaseRecommender):
             "item_biases": self.item_biases,
             "user_embeddings": self.user_embeddings,
             "item_embeddings": self.item_embeddings,
+            "user_mapping": dict(self._user_mapping) if self._user_mapping is not None else None,
+            "item_mapping": dict(self._item_mapping) if self._item_mapping is not None else None,
         }
 
         with open(os.path.join(path, "lightfm_model.pkl"), "wb") as f:
@@ -292,3 +307,25 @@ class LightFMModel(BaseRecommender):
                 self.item_features = pickle.load(f)
         except FileNotFoundError:
             self.item_features = None
+
+        self._user_mapping = model_state.get("user_mapping")
+        self._item_mapping = model_state.get("item_mapping")
+
+    def _resolve_user_index(
+        self,
+        user_id: Union[int, str],
+        override_mapping: Optional[Mapping[Union[int, str], int]] = None,
+    ) -> int:
+        mapping = override_mapping or self._user_mapping
+        if mapping is not None:
+            try:
+                return int(mapping[user_id])
+            except KeyError as exc:
+                raise KeyError(f"User ID {user_id!r} not present in mapping") from exc
+
+        if isinstance(user_id, str):
+            if user_id.isdigit():
+                return int(user_id)
+            raise ValueError("user_id must be convertible to int when no mapping is supplied")
+
+        return int(user_id)

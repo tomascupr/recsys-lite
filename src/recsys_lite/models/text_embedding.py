@@ -158,20 +158,30 @@ class TextEmbeddingModel(BaseRecommender):
             if embedding_path.exists() and ids_path.exists():
                 try:
                     logger.info(f"Loading cached embeddings from {embedding_path}")
-                    self.item_embeddings = np.load(str(embedding_path))
+                    cached_embeddings = np.load(str(embedding_path), allow_pickle=False)
 
                     with open(ids_path, "r") as f:
-                        self.item_ids = json.load(f)
+                        cached_ids = json.load(f)
 
-                    # Create id to index mapping
-                    if self.item_ids:
-                        self.id_to_idx = {id_: i for i, id_ in enumerate(self.item_ids)}
+                    if cached_embeddings.ndim != 2:
+                        raise ValueError("Cached embeddings must be a 2D array")
 
-                    item_count = 0 if self.item_ids is None else len(self.item_ids)
-                    logger.info(f"Loaded embeddings for {item_count} items")
+                    if len(cached_ids) != cached_embeddings.shape[0]:
+                        raise ValueError("Mismatch between cached embeddings and item IDs")
+
+                    if cached_embeddings.dtype != np.float32:
+                        cached_embeddings = cached_embeddings.astype(np.float32, copy=False)
+
+                    self.item_embeddings = cached_embeddings
+                    self.item_ids = cached_ids
+                    self.id_to_idx = {id_: i for i, id_ in enumerate(cached_ids)}
+                    self.embedding_dim = cached_embeddings.shape[1]
+
+                    item_count = len(cached_ids)
+                    logger.info(f"Loaded embeddings for {item_count} items from cache")
                     return
                 except Exception as e:
-                    logger.warning(f"Error loading cached embeddings: {e}")
+                    logger.warning(f"Error loading cached embeddings: {e}. Regenerating embeddings.")
 
         # Load model if not already loaded
         if self.model is None:
@@ -183,35 +193,7 @@ class TextEmbeddingModel(BaseRecommender):
                 self.embedding_dim = self.model.get_sentence_embedding_dimension()
                 logger.info(f"Model loaded with embedding dimension: {self.embedding_dim}")
 
-            # Performance optimization: Enable ONNX if available
-            try:
-                # Test if optimum and onnxruntime are available
-                import importlib.util
-
-                has_optimum = importlib.util.find_spec("optimum") is not None
-                has_onnx = importlib.util.find_spec("onnxruntime") is not None
-
-                if has_optimum and has_onnx:
-                    from optimum.onnxruntime import ORTModelForFeatureExtraction
-
-                    # Convert to ONNX for faster inference
-                    if output_dir:
-                        onnx_path = Path(output_dir) / "model.onnx"
-                        if not onnx_path.exists() and self.model is not None:
-                            logger.info("Converting model to ONNX format for faster inference...")
-                            self.model.export_to_onnx(str(onnx_path))
-
-                        # Load ONNX model for faster inference
-                        if onnx_path.exists():
-                            logger.info("Using ONNX acceleration for faster inference")
-                            # Re-initialize with ONNX backend
-                            self.model = SentenceTransformer(
-                                modules=[ORTModelForFeatureExtraction.from_pretrained(str(onnx_path))]
-                            )
-                            self.using_onnx = True
-                            logger.info("ONNX acceleration enabled successfully")
-            except ImportError:
-                logger.info("ONNX optimization not available. Using standard inference.")
+            # ONNX acceleration is disabled by default.  Provide explicit configuration to enable in future.
 
         # Prepare text data
         texts, item_ids = self._prepare_item_text(item_data)

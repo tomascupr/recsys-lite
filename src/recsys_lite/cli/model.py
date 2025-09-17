@@ -12,6 +12,7 @@ from recsys_lite.cli import app, logger
 from recsys_lite.cli.types import ModelType
 from recsys_lite.indexing import FaissIndexBuilder
 from recsys_lite.models import ModelRegistry
+from recsys_lite.utils import IdMapper
 
 
 @app.command()
@@ -44,16 +45,18 @@ def train(
     logger.info("Creating user and item mappings")
     unique_users = user_item_df["user_id"].unique()
     unique_items = user_item_df["item_id"].unique()
-    user_mapping = {u: i for i, u in enumerate(unique_users)}
-    item_mapping = {it: j for j, it in enumerate(unique_items)}
+    user_mapper = IdMapper.from_iterable(unique_users)
+    item_mapper = IdMapper.from_iterable(unique_items)
+    user_mapping = user_mapper.to_dict()
+    item_mapping = item_mapper.to_dict()
     item_data = {row["item_id"]: row.to_dict() for _, row in item_df.iterrows()}
     if model_type == ModelType.TEXT_EMBEDDING:
         user_item_matrix = None
     else:
         rows, cols, data = [], [], []
         for _, row in user_item_df.iterrows():
-            rows.append(user_mapping[row["user_id"]])
-            cols.append(item_mapping[row["item_id"]])
+            rows.append(user_mapper.to_index(row["user_id"]))
+            cols.append(item_mapper.to_index(row["item_id"]))
             data.append(row["interaction"])
         user_item_matrix = csr_matrix((data, (rows, cols)), shape=(len(user_mapping), len(item_mapping)))
     params = {}
@@ -104,6 +107,8 @@ def train(
         }
     elif model_type == ModelType.EASE:
         model_params = {"lambda_": params.get("lambda_", 0.5)}
+        if "topk" in params and params["topk"] is not None:
+            model_params["topk"] = int(params["topk"])
     elif model_type == ModelType.TEXT_EMBEDDING:
         model_params = {
             "model_name": params.get("model_name", "all-MiniLM-L6-v2"),

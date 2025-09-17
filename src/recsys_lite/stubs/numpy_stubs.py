@@ -10,7 +10,7 @@ and avoids the native extension import entirely.
 import os as _os
 import sys as _sys
 import types as _types
-from typing import Any, List, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 
 # Use stubs when the CI environment variable is set
 is_ci = _os.environ.get("CI", "").lower() == "true"
@@ -53,12 +53,12 @@ def install_numpy_stub() -> None:  # pragma: no cover – executed at import tim
 
     # Random namespace ------------------------------------------------------
     class _RandomState:  # Minimal replacement – enough for tests
-        def __init__(self, seed: int | None = None) -> None:  # noqa: D401
+        def __init__(self, seed: Optional[int] = None) -> None:  # noqa: D401
             import random as _random
 
             self._rng = _random.Random(seed)
 
-        def randint(self, low: int, high: int | None = None, size: int | None = None):
+        def randint(self, low: int, high: Optional[int] = None, size: Optional[int] = None):
             if high is None:
                 low, high = 0, low
             if size is None:

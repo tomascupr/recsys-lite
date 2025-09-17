@@ -43,7 +43,7 @@ patch_test_cli_module()
 
 """RecSys-Lite: Lightweight recommendation system for small e-commerce shops."""
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 
 # Export core models for backward compatibility
 from .models import ALSModel as ALSModel, EASEModel as EASEModel

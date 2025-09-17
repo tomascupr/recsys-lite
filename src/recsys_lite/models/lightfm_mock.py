@@ -50,6 +50,8 @@ class LightFMModel(BaseRecommender):
         self.item_embeddings: Optional[NDArray[np.float32]] = None
         self.user_features: Optional[sp.csr_matrix] = None
         self.item_features: Optional[sp.csr_matrix] = None
+        self._user_mapping: Optional[Dict[Union[int, str], int]] = None
+        self._item_mapping: Optional[Dict[Union[int, str], int]] = None
 
     def fit(self, user_item_matrix: sp.csr_matrix, **kwargs: Any) -> None:
         """Fit the mock model on user-item interaction data.
@@ -64,6 +66,8 @@ class LightFMModel(BaseRecommender):
         self.item_biases = np.zeros(n_items, dtype=np.float64)
         self.user_embeddings = np.random.rand(n_users, self.no_components).astype(np.float32)
         self.item_embeddings = np.random.rand(n_items, self.no_components).astype(np.float32)
+        self._user_mapping = kwargs.get("user_mapping", self._user_mapping)
+        self._item_mapping = kwargs.get("item_mapping", self._item_mapping)
 
     def recommend(
         self,
@@ -83,18 +87,34 @@ class LightFMModel(BaseRecommender):
         Returns:
             Tuple of (item_ids, scores)
         """
-        # Convert string user_id to int if needed
-        if isinstance(user_id, str):
-            user_id = int(user_id)
+        user_idx = self._resolve_user_index(user_id, kwargs.get("user_mapping"))
 
         # Get number of items
         if self.item_embeddings is None:
             raise ValueError("Model has not been trained, item_embeddings is None")
         n_items_total = self.item_embeddings.shape[0]
 
+        filter_items = kwargs.get("filter_items")
+        if filter_items is None and user_items is not None:
+            if not sp.isspmatrix_csr(user_items):
+                user_items = sp.csr_matrix(user_items)
+            if user_items.shape[0] == 1:
+                filter_items = user_items.indices
+            elif user_idx < user_items.shape[0]:
+                filter_items = user_items.getrow(user_idx).indices
+            else:
+                filter_items = np.array([], dtype=np.int64)
+        if filter_items is None:
+            filter_items = np.array([], dtype=np.int64)
+
         # Just return random recommendations
-        top_items = np.random.choice(n_items_total, size=n_items, replace=False).astype(np.int_)
-        top_scores = np.random.random(n_items).astype(np.float32)
+        rng_seed = (self.random_state or 0) + int(user_idx)
+        rng = np.random.RandomState(rng_seed)
+        candidate_indices = rng.permutation(n_items_total)
+        mask = ~np.isin(candidate_indices, filter_items)
+        candidate_indices = candidate_indices[mask][:n_items]
+        top_items = candidate_indices.astype(np.int_)
+        top_scores = rng.random(len(top_items)).astype(np.float32)
 
         return top_items, top_scores
 
@@ -198,6 +218,22 @@ class LightFMModel(BaseRecommender):
             "user_embeddings": self.user_embeddings,
             "item_embeddings": self.item_embeddings,
         }
+
+    def _resolve_user_index(
+        self, user_id: Union[int, str], override_mapping: Optional[Dict[Union[int, str], int]]
+    ) -> int:
+        mapping = override_mapping or self._user_mapping
+        if mapping is not None:
+            if user_id in mapping:
+                return int(mapping[user_id])
+            raise KeyError(f"User ID {user_id!r} not present in mapping")
+
+        if isinstance(user_id, str):
+            if user_id.isdigit():
+                return int(user_id)
+            raise ValueError("user_id must be convertible to int when no mapping is supplied")
+
+        return int(user_id)
 
     def _set_model_state(self, model_state: Dict[str, Any]) -> None:
         """Set model state from deserialized data."""

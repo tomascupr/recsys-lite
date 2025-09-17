@@ -2,7 +2,7 @@
 
 **Deploy state-of-the-art recommendations without selling your soul to AWS.**
 
-![RecSys-Lite](https://img.shields.io/badge/RecSys--Lite-v0.3.2-blue)
+![RecSys-Lite](https://img.shields.io/badge/RecSys--Lite-v0.3.3-blue)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100.0-green)
 ![React](https://img.shields.io/badge/React-18-blue)
@@ -29,11 +29,11 @@ poetry run recsys-lite serve
 # 🎉 Your recommendation API is live at http://localhost:8000
 ```
 
-> **What’s fresh in 0.3.2?**
-> - 🔄 Zero-downtime incremental updates: worker now syncs mappings and Faiss indices safely.
-> - 🧹 Real cache invalidation: `/cache/invalidate/*` deletes actual keys (LRU or Redis).
-> - 🛡️ Deterministic vector retrieval: surfaces actionable `VectorRetrievalError`s with an opt-in legacy fallback.
-> - ✅ Safer ingestion: schema validation + idempotent DuckDB loads so reruns won’t corrupt prod data.
+> **What’s fresh in 0.3.3?**
+> - 🏋️‍♀️ Real EASE-R implementation with optional top-K sparsification and faiss-ready vectors.
+> - 🔁 ALS/LightFM now handle external ID mappings, incremental updates, and single-row inference safely.
+> - 🧠 Text embeddings get resilient caching (no more corrupt `.npy` surprises) and explicit ONNX opt-in.
+> - 🧭 New `IdMapper` utility powers CLI training and update worker without brittle manual dicts.
 
 ## 💰 The Money Shot: RecSys-Lite vs The Competition
 

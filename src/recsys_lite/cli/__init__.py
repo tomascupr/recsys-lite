@@ -52,6 +52,7 @@ from recsys_lite.cli.model import train, train_hybrid  # noqa: F401
 from recsys_lite.cli.optimize import optimize  # noqa: F401
 from recsys_lite.cli.serve import serve, worker  # noqa: F401
 from recsys_lite.cli.types import MetricType, ModelType, QueueType  # noqa: F401
+from recsys_lite.indexing import FaissIndexBuilder  # noqa: F401
 
 __all__ = [
     "app",
@@ -69,4 +70,5 @@ __all__ = [
     "optimize",
     "serve",
     "worker",
+    "FaissIndexBuilder",
 ]

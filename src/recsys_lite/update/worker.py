@@ -27,9 +27,9 @@ class UpdateWorker:
         db_path: Path,
         model: Any,
         faiss_index: faiss.Index,
-        user_mapping: Dict[str, int],
-        item_mapping: Dict[str, int],
-        model_dir: Path,
+        user_mapping: Optional[Dict[str, int]] = None,
+        item_mapping: Optional[Dict[str, int]] = None,
+        model_dir: Optional[Path] = None,
         item_id_map: Optional[Dict[int, str]] = None,
         batch_size: int = 1000,
         interval: int = 60,
@@ -55,13 +55,24 @@ class UpdateWorker:
         self.db_path = Path(db_path)
         self.model = model
         self.faiss_index = faiss_index
-        self.model_dir = Path(model_dir)
-        self.user_mapping: Dict[str, int] = {str(k): int(v) for k, v in user_mapping.items()}
+        self.model_dir = Path(model_dir) if model_dir is not None else Path.cwd()
+
+        forward_user_mapping = user_mapping or {}
+        self.user_mapping: Dict[str, int] = {str(k): int(v) for k, v in forward_user_mapping.items()}
         self.reverse_user_mapping: Dict[int, str] = {int(v): str(k) for k, v in self.user_mapping.items()}
-        self.item_mapping: Dict[str, int] = {str(k): int(v) for k, v in item_mapping.items()}
-        self.item_id_map: Dict[int, str] = (
-            {int(k): str(v) for k, v in item_id_map.items()} if item_id_map is not None else {int(v): str(k) for k, v in item_mapping.items()}
-        )
+
+        if item_mapping is None:
+            if item_id_map is not None:
+                item_mapping = {str(v): int(k) for k, v in item_id_map.items()}
+            else:
+                item_mapping = {}
+
+        self.item_mapping = {str(k): int(v) for k, v in item_mapping.items()}
+
+        if item_id_map is not None:
+            self.item_id_map = {int(k): str(v) for k, v in item_id_map.items()}
+        else:
+            self.item_id_map = {int(v): str(k) for k, v in self.item_mapping.items()}
         self.batch_size = batch_size
         self.interval = interval
         self.last_timestamp = 0

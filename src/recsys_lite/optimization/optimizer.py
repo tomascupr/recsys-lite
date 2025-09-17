@@ -4,8 +4,12 @@ import os
 from typing import Any, Dict, Optional, Union
 
 import numpy as np
-import optuna
 import scipy.sparse as sp
+
+try:  # pragma: no cover - optional dependency
+    import optuna
+except ImportError:  # pragma: no cover - optional dependency missing
+    optuna = None  # type: ignore[assignment]
 
 from recsys_lite.optimization.metrics import hr_at_k, ndcg_at_k
 
@@ -36,6 +40,10 @@ class OptunaOptimizer:
             storage: Optuna storage URL
             seed: Random seed for reproducibility
         """
+        if optuna is None:  # pragma: no cover - executed when dependency missing
+            raise ImportError(
+                "Optuna is not installed. Install the 'optuna' extra to use OptunaOptimizer."
+            )
         self.model_class = model_class
 
         # Parse metric and k
@@ -60,7 +68,7 @@ class OptunaOptimizer:
         self.seed = seed
 
         # Optuna study
-        self.study: Optional[optuna.Study] = None
+        self.study = None
         self.best_params: Optional[Dict[str, Any]] = None
         self.best_value: Optional[float] = None
 

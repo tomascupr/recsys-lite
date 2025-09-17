@@ -5,7 +5,18 @@ All notable changes to the RecSys-Lite project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.1] - 2025-07-26
+## [0.3.3] - 2025-09-17
+
+### Added
+- Production-ready EASE-R solver with optional top-k sparsification and persisted vectors for Faiss.
+- `IdMapper` utility and coverage tests to centralise ID/index bookkeeping across services.
+
+### Changed
+- ALS and LightFM models now support explicit ID mappings, safe incremental updates, and single-row recommendation calls.
+- CLI training pipeline builds matrices via `IdMapper`, emits consistent mapping artifacts, and registers Faiss builder for monkeypatching.
+- Text embedding model validates caches, removes brittle ONNX auto-export, and improves logging around regeneration.
+- Update worker accepts optional mappings and defaults to sane paths for easier scripted use.
+- Optuna integration now treats the dependency as optional and raises helpful guidance when missing.
 
 ## [0.3.2] - 2025-09-17
 
@@ -33,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expanded dependency version ranges to allow minor updates
 - Updated Poetry lock file with all security patches
 - Modernized README with compelling developer-focused messaging
+
+## [0.3.1] - 2025-07-26
 
 ## [0.3.0] - 2025-04-20
 
