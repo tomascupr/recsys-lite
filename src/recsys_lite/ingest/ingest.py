@@ -5,43 +5,128 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
+
+import csv
 
 import duckdb
 import pandas as pd
-import pyarrow as pa
+import pyarrow.parquet as pq
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
+EVENT_REQUIRED_COLUMNS = {"user_id", "item_id", "ts", "qty"}
+ITEM_REQUIRED_COLUMNS = {"item_id", "category", "brand", "price", "img_url"}
+
 
 def ingest_data(events_path: Path, items_path: Path, db_path: Path) -> None:
-    """Ingest data into DuckDB database.
+    """Ingest data into DuckDB database with schema validation and idempotency."""
 
-    Args:
-        events_path: Path to events parquet file
-        items_path: Path to items CSV file
-        db_path: Path to DuckDB database
-    """
+    events_path = events_path.expanduser().resolve()
+    items_path = items_path.expanduser().resolve()
+    db_path = db_path.expanduser().resolve()
+
+    _validate_events_schema(events_path)
+    _validate_items_schema(items_path)
+
     conn = duckdb.connect(str(db_path))
     try:
-        # Create events table
+        conn.execute("BEGIN TRANSACTION")
+
         conn.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS events AS
-            SELECT * FROM read_parquet('{events_path}')
             """
+            CREATE TABLE IF NOT EXISTS events (
+                user_id VARCHAR,
+                item_id VARCHAR,
+                ts BIGINT,
+                qty DOUBLE
+            )
+            """
+        )
+        conn.execute("DELETE FROM events")
+        conn.execute(
+            """
+            INSERT INTO events (user_id, item_id, ts, qty)
+            SELECT CAST(user_id AS VARCHAR),
+                   CAST(item_id AS VARCHAR),
+                   CAST(ts AS BIGINT),
+                   CAST(qty AS DOUBLE)
+            FROM read_parquet(?)
+            """,
+            [str(events_path)],
         )
 
-        # Create items table
         conn.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS items AS
-            SELECT * FROM read_csv('{items_path}')
+            """
+            CREATE TABLE IF NOT EXISTS items (
+                item_id VARCHAR PRIMARY KEY,
+                category VARCHAR,
+                brand VARCHAR,
+                price DOUBLE,
+                img_url VARCHAR
+            )
             """
         )
+        conn.execute("DELETE FROM items")
+        conn.execute(
+            """
+            INSERT INTO items (item_id, category, brand, price, img_url)
+            SELECT CAST(item_id AS VARCHAR),
+                   CAST(category AS VARCHAR),
+                   CAST(brand AS VARCHAR),
+                   CAST(price AS DOUBLE),
+                   CAST(img_url AS VARCHAR)
+            FROM read_csv_auto(?, HEADER=TRUE)
+            """,
+            [str(items_path)],
+        )
+
+        conn.execute("COMMIT")
+        logger.info("Ingested events and items into DuckDB", extra={"db_path": str(db_path)})
+    except Exception:
+        conn.execute("ROLLBACK")
+        logger.exception("Failed to ingest data", extra={"db_path": str(db_path)})
+        raise
     finally:
         conn.close()
+
+
+def _validate_events_schema(events_path: Path) -> None:
+    """Ensure the events parquet file contains the required columns."""
+
+    try:
+        schema = pq.read_schema(events_path)
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"Events file not found: {events_path}") from exc
+
+    missing = EVENT_REQUIRED_COLUMNS.difference(schema.names)
+    if missing:
+        raise ValueError(f"Events file is missing required columns: {sorted(missing)}")
+
+
+def _validate_items_schema(items_path: Path) -> None:
+    """Ensure the items CSV contains the required columns."""
+
+    if not items_path.exists():
+        raise FileNotFoundError(f"Items file not found: {items_path}")
+
+    header = _read_csv_header(items_path)
+    missing = ITEM_REQUIRED_COLUMNS.difference(header)
+    if missing:
+        raise ValueError(f"Items file is missing required columns: {sorted(missing)}")
+
+
+def _read_csv_header(csv_path: Path) -> Iterable[str]:
+    """Return the header row for a CSV file without loading its contents."""
+
+    with csv_path.open("r", encoding="utf-8") as handle:
+        reader = csv.reader(handle)
+        try:
+            header = next(reader)
+        except StopIteration as exc:
+            raise ValueError(f"Items CSV is empty: {csv_path}") from exc
+    return [col.strip() for col in header if col.strip()]
 
 
 # ---------------------------------------------------------------------------
@@ -109,16 +194,30 @@ def _append_parquet_to_events(parquet_file: Path, db_path: Path) -> None:
 
     conn = duckdb.connect(str(db_path))
     try:
-        # Ensure the events table exists – if not, create it on‑the‑fly.
+        _validate_events_schema(parquet_file)
+
         conn.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS events AS
-            SELECT * FROM read_parquet('{parquet_file}') WHERE 0=1
+            """
+            CREATE TABLE IF NOT EXISTS events (
+                user_id VARCHAR,
+                item_id VARCHAR,
+                ts BIGINT,
+                qty DOUBLE
+            )
             """
         )
 
-        # Append the actual data
-        conn.execute(f"INSERT INTO events SELECT * FROM read_parquet('{parquet_file}')")
+        conn.execute(
+            """
+            INSERT INTO events (user_id, item_id, ts, qty)
+            SELECT CAST(user_id AS VARCHAR),
+                   CAST(item_id AS VARCHAR),
+                   CAST(ts AS BIGINT),
+                   CAST(qty AS DOUBLE)
+            FROM read_parquet(?)
+            """,
+            [str(parquet_file)],
+        )
     finally:
         conn.close()
 

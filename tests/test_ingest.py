@@ -88,3 +88,69 @@ def test_ingest_data(sample_data):
 
     # Close connection
     conn.close()
+
+
+def test_ingest_data_overwrites_existing(sample_data):
+    """Running ingest multiple times should replace previous data."""
+    events_path, items_path, db_path = sample_data
+
+    ingest_data(events_path, items_path, db_path)
+
+    # Rewrite events with different content
+    updated_events = pd.DataFrame(
+        {
+            "user_id": ["U_99"],
+            "item_id": ["I_99"],
+            "ts": [1710000000],
+            "qty": [5],
+        }
+    )
+    updated_events.to_parquet(events_path, index=False)
+
+    ingest_data(events_path, items_path, db_path)
+
+    conn = duckdb.connect(str(db_path))
+    events_df = conn.execute("SELECT * FROM events").fetchdf()
+    conn.close()
+
+    assert len(events_df) == 1
+    assert events_df.iloc[0]["user_id"] == "U_99"
+
+
+def test_ingest_data_missing_events_column(sample_data):
+    """Missing mandatory event columns should raise."""
+    events_path, items_path, db_path = sample_data
+
+    bad_events = pd.DataFrame(
+        {
+            "user_id": ["U"],
+            "item_id": ["I"],
+            "ts": [1],
+            # qty column deliberately omitted
+        }
+    )
+    bad_path = events_path.with_name("bad_events.parquet")
+    bad_events.to_parquet(bad_path, index=False)
+
+    with pytest.raises(ValueError, match="missing required columns"):
+        ingest_data(bad_path, items_path, db_path)
+
+
+def test_ingest_data_missing_item_column(sample_data):
+    """Missing mandatory item columns should raise."""
+    events_path, items_path, db_path = sample_data
+
+    bad_items = pd.DataFrame(
+        {
+            "item_id": ["I_01"],
+            "category": ["electronics"],
+            # brand column omitted
+            "price": [1.0],
+            "img_url": ["http://example.com/1.jpg"],
+        }
+    )
+    bad_items_path = items_path.with_name("bad_items.csv")
+    bad_items.to_csv(bad_items_path, index=False)
+
+    with pytest.raises(ValueError, match="missing required columns"):
+        ingest_data(events_path, bad_items_path, db_path)

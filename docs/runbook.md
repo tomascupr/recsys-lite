@@ -180,6 +180,10 @@ recsys-lite ingest \
   --db data/recsys.db
 ```
 
+The ingest command validates required columns and replaces the existing `events`
+and `items` tables atomically, so re-running it with a corrected dataset safely
+refreshes your DuckDB instance.
+
 ### Incremental Data Loading
 
 For incremental data loading, place new event data in Parquet format in the `/data/incremental` directory with filenames containing timestamps (e.g., `events_20230315.parquet`).
@@ -437,10 +441,11 @@ The update worker keeps recommendations fresh by incrementally updating models w
 ### Update Process
 
 1. Worker polls for new events every `INTERVAL` seconds (default: 60)
-2. New events are retrieved from the incremental data directory
-3. Events are converted to a sparse user-item matrix
-4. User factors are updated with `partial_fit_users`
-5. New item vectors are added to the Faiss index
+2. New events are gathered from DuckDB as well as the incremental Parquet drop directory
+3. Events are converted into a sparse matrix aligned with the trained user/item mappings
+4. Previously unseen users are appended to the mapping and persisted alongside the model artifacts
+5. User factors are updated with `partial_fit_users`
+6. New vectors for existing catalog items are added to the Faiss index; items missing from the trained mapping are logged for the next retrain
 
 ### Starting the Worker
 
@@ -449,7 +454,8 @@ The update worker keeps recommendations fresh by incrementally updating models w
 recsys-lite worker \
   --model-dir model_artifacts/als \
   --db data/recsys.db \
-  --interval 60
+  --interval 60 \
+  --incremental-dir data/incremental
 ```
 
 ### Worker Configuration
@@ -462,7 +468,7 @@ export MODEL_DIR=model_artifacts/als
 export DB_PATH=data/recsys.db
 export WORKER_INTERVAL=60
 export BATCH_SIZE=1000
-export THREADS=8
+export INCREMENTAL_DIR=data/incremental
 
 # Start with custom configuration
 recsys-lite worker \
@@ -470,7 +476,7 @@ recsys-lite worker \
   --db $DB_PATH \
   --interval $WORKER_INTERVAL \
   --batch-size $BATCH_SIZE \
-  --threads $THREADS
+  --incremental-dir $INCREMENTAL_DIR
 ```
 
 ### Monitoring Worker Status

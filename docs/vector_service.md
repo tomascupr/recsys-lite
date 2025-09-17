@@ -6,7 +6,7 @@ The Vector Service is a core component of RecSys-Lite that provides a unified in
 
 - Unified interface for retrieving user and item vectors
 - Support for different model types and implementations
-- Graceful fallback mechanisms
+- Deterministic error propagation with optional legacy fallback
 - Robust error handling
 - Consistent logging
 
@@ -18,7 +18,7 @@ The Vector Service is designed to work with different types of recommendation mo
 
 2. **Models with factor matrices**: These models store user and item factors as matrices and provide access through `get_user_factors` and `get_item_factors` methods.
 
-3. **Fallback to random vectors**: If neither of the above is available, the service falls back to generating random vectors of the appropriate size.
+3. **Optional fallback**: In modern configurations the service raises a `VectorRetrievalError` when vectors are unavailable; an opt-in `allow_random_fallback=True` flag preserves the legacy random-vector behaviour when strictly required.
 
 ## Usage
 
@@ -88,7 +88,7 @@ except VectorRetrievalError as e:
 
 2. **Try factor matrices**: If the standardized interface is not available or fails, the service tries to access the factor matrices directly.
 
-3. **Fallback to random vectors**: If all else fails, the service generates a random vector of the appropriate size.
+3. **Signal failure (default)**: If both strategies return no data, the service raises a `VectorRetrievalError`. When `allow_random_fallback=True` is supplied, it instead generates a random vector for backwards compatibility.
 
 ### Error Handling
 

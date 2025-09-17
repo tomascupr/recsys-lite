@@ -1,6 +1,7 @@
 """Serving and update worker commands for RecSys-Lite CLI."""
 
 from pathlib import Path
+from typing import Optional
 
 import typer
 
@@ -34,7 +35,7 @@ def worker(
     model_dir: Path = typer.Option("model_artifacts/als", help="Model directory"),
     db: Path = typer.Option("recsys.db", help="DuckDB database path"),
     interval: int = typer.Option(60, help="Update interval in seconds"),
-    incremental_dir: Path = typer.Option(None, help="Directory to watch for incremental data"),
+    incremental_dir: Optional[Path] = typer.Option(None, help="Directory to watch for incremental data"),
 ) -> None:
     """Start the update worker for incremental model updates."""
     from recsys_lite.api.loaders import load_faiss_index, load_model
@@ -47,17 +48,24 @@ def worker(
         typer.echo(f"Database {db} does not exist")
         raise typer.Exit(code=1)
 
-    model, model_type = load_model(Path(model_dir))
+    model, _ = load_model(Path(model_dir))
     faiss_index = load_faiss_index(Path(model_dir))
     import json
 
-    item_map = json.loads((model_dir / "item_mapping.json").read_text())
-    reverse_map = {int(v): k for k, v in item_map.items()}
+    user_map_raw = json.loads((model_dir / "user_mapping.json").read_text())
+    item_map_raw = json.loads((model_dir / "item_mapping.json").read_text())
+
+    user_map = {str(k): int(v) for k, v in user_map_raw.items()}
+    item_map = {str(k): int(v) for k, v in item_map_raw.items()}
+    reverse_map = {int(v): str(k) for k, v in item_map.items()}
 
     worker_instance = UpdateWorker(
         db_path=db,
         model=model,
         faiss_index=faiss_index,
+        user_mapping=user_map,
+        item_mapping=item_map,
+        model_dir=model_dir,
         item_id_map=reverse_map,
         interval=interval,
         incremental_dir=incremental_dir,

@@ -33,13 +33,15 @@ class EntityType(str, Enum):
 class VectorRetrievalService:
     """Service for retrieving vector representations from different model types."""
 
-    def __init__(self, cache_manager: Optional[CacheManager] = None):
+    def __init__(self, cache_manager: Optional[CacheManager] = None, allow_random_fallback: bool = False):
         """Initialize vector retrieval service.
 
         Args:
             cache_manager: Cache manager for vector caching
+            allow_random_fallback: Whether to fall back to random vectors when retrieval fails
         """
         self.cache_manager = cache_manager
+        self.allow_random_fallback = allow_random_fallback
 
     def get_vector(
         self,
@@ -78,6 +80,8 @@ class VectorRetrievalService:
 
             if cached_vector is not None:
                 return cached_vector
+
+        vector_result: Optional[NDArray[np.float32]] = None
 
         try:
             # Determine which methods to call based on entity type
@@ -144,16 +148,38 @@ class VectorRetrievalService:
                         extra={"entity_idx": entity_idx, "entity_id": entity_id},
                     )
 
-            # Fallback to random vector
-            if vector_size is None:
-                vector_size = getattr(model, "factors", 100)
+            if vector_result is not None:
+                return vector_result
 
-            logger.info(
-                f"Using random vector for {entity_type.value} {entity_id or entity_idx}",
-                extra={"vector_size": vector_size},
+            if self.allow_random_fallback:
+                if vector_size is None:
+                    vector_size = getattr(model, "factors", 100)
+
+                logger.info(
+                    f"Using random vector for {entity_type.value} {entity_id or entity_idx}",
+                    extra={"vector_size": vector_size},
+                )
+                return cast(NDArray[np.float32], np.random.random(vector_size).astype(np.float32).reshape(1, -1))
+
+            reason = (
+                "model did not return vectors via get_* methods or factors"
             )
-            return cast(NDArray[np.float32], np.random.random(vector_size).astype(np.float32).reshape(1, -1))
+            logger.error(
+                "Failed to retrieve vector without fallback",
+                extra={
+                    "entity_type": entity_type.value,
+                    "entity_idx": entity_idx,
+                    "entity_id": entity_id,
+                },
+            )
+            raise VectorRetrievalError(
+                entity_type=entity_type.value,
+                entity_id=str(entity_id) if entity_id is not None else str(entity_idx),
+                reason=reason,
+            )
 
+        except VectorRetrievalError:
+            raise
         except Exception as e:
             # Catch any unexpected errors
             error_msg = f"Unexpected error retrieving {entity_type.value} vector"
@@ -446,7 +472,7 @@ class RecommendationEngine:
             item_ids = []
             scores = []
 
-            for idx, score in zip(indices[0], distances[0], strict=False):
+            for idx, score in zip(indices[0], distances[0]):
                 if idx == -1:  # Faiss returns -1 for no results
                     continue
 
@@ -567,7 +593,7 @@ class RecommendationEngine:
             )
             raise
 
-        for idx, score in zip(indices[0], distances[0], strict=False):
+        for idx, score in zip(indices[0], distances[0]):
             if idx == -1:  # Faiss returns -1 for no results
                 continue
 
@@ -647,7 +673,9 @@ class RecommendationService:
         self.model_version = model_version
 
         # Initialize specialized services
-        self.vector_retrieval_service = VectorRetrievalService(cache_manager)
+        vector_service = VectorRetrievalService(cache_manager)
+        self._vector_retrieval_service = vector_service
+        self.vector_retrieval_service = vector_service
         self.filtering_service = FilteringService()
         self.pagination_service = PaginationService()
         self.recommendation_engine = RecommendationEngine(
@@ -660,6 +688,19 @@ class RecommendationService:
             cache_manager=cache_manager,
             model_version=model_version,
         )
+        self.recommendation_engine.vector_retrieval_service = vector_service
+
+    @property
+    def vector_service(self) -> VectorRetrievalService:
+        """Backwards-compatible alias for vector retrieval service."""
+
+        return self._vector_retrieval_service
+
+    @vector_service.setter
+    def vector_service(self, value: VectorRetrievalService) -> None:
+        self._vector_retrieval_service = value
+        self.vector_retrieval_service = value
+        self.recommendation_engine.vector_retrieval_service = value
 
     def recommend_for_user(
         self,

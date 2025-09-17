@@ -275,7 +275,9 @@ class RedisCache(CacheBackend):
                 )
 
             # Test connection
-            self._client.ping()
+            ping_result = self._client.ping()
+            if not ping_result:
+                raise ConnectionError("Redis ping returned falsy result")
             self._connection_error = False
             logger.info("Redis cache connected successfully")
 

@@ -113,11 +113,12 @@ graph TD
   - Standardized error handling with consistent error responses
   - Structured logging with context information
 
-- **Update Worker**: Micro-batch worker that updates models incrementally
-  - Runs every 60 seconds
-  - Fetches new events from DB or Parquet files
+- **Update Worker**: Micro-batch worker that updates models incrementally without full retrains
+  - Runs every 60 seconds (configurable)
+  - Fetches new events from DuckDB and incremental Parquet drops
+  - Reuses the persisted user mapping, adding unseen users and writing the mapping back to disk
   - Updates user factors with `partial_fit_users`
-  - Adds new item vectors to Faiss index
+  - Adds new item vectors to Faiss for catalog items already present in the trained mapping and logs unknown items for follow-up retraining
 
 ### Frontend Layer
 
@@ -157,8 +158,9 @@ graph TD
    - Streaming options include:
      - File-based: `stream-ingest` helper watches a directory for new parquet files
      - Message queue-based: `queue-ingest` consumes events from RabbitMQ or Kafka
-   - DuckDB provides efficient querying for model training
-   - Supports batch, streaming, and incremental ingestion modes
+ - DuckDB provides efficient querying for model training
+  - CLI ingestion validates schemas and replaces tables atomically for repeatable loads
+  - Supports batch, streaming, and incremental ingestion modes
 
 2. **Training**:
    - Models are trained on the ingested data
@@ -173,10 +175,11 @@ graph TD
    - Performance metrics are tracked and exposed
 
 4. **Updates**:
-   - Update worker polls for new events every 60 seconds
-   - Models are updated incrementally with new user interactions
-   - Faiss index is updated with new item vectors
-   - No retraining required for regular updates
+   - Update worker polls for new events every 60 seconds (tunable)
+   - Merges interactions from the core DuckDB tables and the incremental drop directory based on the last processed timestamp
+   - Expands the user mapping automatically when new users arrive and persists it with the model artifacts
+   - Refreshes user factors via `partial_fit_users`
+   - Adds vectors for items already in the trained mapping and surfaces new catalog items that require a retrain to incorporate fully
 
 5. **GDPR Compliance**:
    - User data can be exported via CLI
