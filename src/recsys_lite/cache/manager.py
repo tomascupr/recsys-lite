@@ -42,6 +42,52 @@ class CacheManager:
         self._total_misses = 0
         self._start_time = time.time()
 
+        # Key registries for targeted invalidation
+        self._user_recommendation_keys: Dict[str, set[str]] = {}
+        self._similar_item_keys: Dict[str, set[str]] = {}
+        self._user_vector_keys: Dict[str, set[str]] = {}
+        self._item_vector_keys: Dict[str, set[str]] = {}
+
+    def _prune_registry(self, registry: Dict[str, set[str]]) -> None:
+        stale_identifiers: List[str] = []
+        for identifier, key_set in list(registry.items()):
+            valid_keys = {cache_key for cache_key in key_set if self._cache.exists(cache_key)}
+            if valid_keys:
+                registry[identifier] = valid_keys
+            else:
+                stale_identifiers.append(identifier)
+
+        for identifier in stale_identifiers:
+            registry.pop(identifier, None)
+
+    def _register_key(self, registry: Dict[str, set[str]], identifier: str, key: str) -> None:
+        self._prune_registry(registry)
+        if identifier not in registry:
+            registry[identifier] = set()
+        registry[identifier].add(key)
+
+    def _collect_keys(self, registry: Dict[str, set[str]], identifier: Optional[str]) -> set[str]:
+        self._prune_registry(registry)
+        if identifier is None:
+            keys: set[str] = set()
+            for key_set in registry.values():
+                keys.update(key_set)
+            registry.clear()
+            return keys
+
+        key_set = registry.pop(identifier, set())
+        return set(key_set)
+
+    def _delete_keys(self, keys: set[str]) -> None:
+        for cache_key in keys:
+            self._cache.delete(cache_key)
+
+    def _reset_registries(self) -> None:
+        self._user_recommendation_keys.clear()
+        self._similar_item_keys.clear()
+        self._user_vector_keys.clear()
+        self._item_vector_keys.clear()
+
     def _get_ttl_for_type(self, cache_type: str) -> int:
         """Get TTL for specific cache type.
 
@@ -202,6 +248,8 @@ class CacheManager:
             },
         )
 
+        self._register_key(self._user_recommendation_keys, user_id, key)
+
     def get_similar_items(
         self,
         item_id: str,
@@ -315,6 +363,8 @@ class CacheManager:
             },
         )
 
+        self._register_key(self._similar_item_keys, item_id, key)
+
     def get_user_vector(self, user_idx: int, model_version: Optional[str] = None) -> Optional[NDArray[np.float32]]:
         """Get cached user vector.
 
@@ -384,6 +434,8 @@ class CacheManager:
                 "cache_time_ms": round((time.time() - start_time) * 1000, 2),
             },
         )
+
+        self._register_key(self._user_vector_keys, str(user_idx), key)
 
     def get_item_vector(self, item_idx: int, model_version: Optional[str] = None) -> Optional[NDArray[np.float32]]:
         """Get cached item vector.
@@ -455,6 +507,8 @@ class CacheManager:
             },
         )
 
+        self._register_key(self._item_vector_keys, str(item_idx), key)
+
     def invalidate_user_cache(self, user_id: Optional[str] = None) -> None:
         """Invalidate user-related cache entries.
 
@@ -465,13 +519,13 @@ class CacheManager:
             return
 
         if user_id:
-            # For specific user, we'd need to track keys or use pattern matching
-            # For now, this is a placeholder - Redis supports pattern deletion
-            logger.info(f"Invalidating cache for user: {user_id}")
+            keys = self._collect_keys(self._user_recommendation_keys, user_id)
+            logger.info(f"Invalidating cache for user: {user_id}", extra={"keys": len(keys)})
+            self._delete_keys(keys)
         else:
-            # Clear all user-related caches
-            logger.info("Invalidating all user caches")
-            # This would require pattern matching or key tracking
+            keys = self._collect_keys(self._user_recommendation_keys, None)
+            logger.info("Invalidating all user caches", extra={"keys": len(keys)})
+            self._delete_keys(keys)
 
     def invalidate_item_cache(self, item_id: Optional[str] = None) -> None:
         """Invalidate item-related cache entries.
@@ -483,9 +537,13 @@ class CacheManager:
             return
 
         if item_id:
-            logger.info(f"Invalidating cache for item: {item_id}")
+            keys = self._collect_keys(self._similar_item_keys, item_id)
+            logger.info(f"Invalidating cache for item: {item_id}", extra={"keys": len(keys)})
+            self._delete_keys(keys)
         else:
-            logger.info("Invalidating all item caches")
+            keys = self._collect_keys(self._similar_item_keys, None)
+            logger.info("Invalidating all item caches", extra={"keys": len(keys)})
+            self._delete_keys(keys)
 
     def invalidate_model_cache(self, model_version: Optional[str] = None) -> None:
         """Invalidate cache when model is updated.
@@ -507,6 +565,7 @@ class CacheManager:
 
         self._cache.clear()
         logger.info("Cleared all cache entries")
+        self._reset_registries()
 
     def get_stats(self) -> Dict[str, Any]:
         """Get comprehensive cache statistics.

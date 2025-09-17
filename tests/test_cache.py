@@ -248,6 +248,48 @@ class TestCacheManager:
         assert cached_vector is not None
         np.testing.assert_array_equal(cached_vector, item_vector)
 
+    def test_invalidate_user_cache_specific(self):
+        config = CacheConfig(enabled=True)
+        manager = CacheManager(config)
+
+        rec1 = (["item1"], [0.9], [{"title": "Item 1"}])
+        rec2 = (["item2"], [0.8], [{"title": "Item 2"}])
+
+        manager.set_user_recommendations("userA", 5, True, rec1)
+        manager.set_user_recommendations("userB", 5, True, rec2)
+
+        assert manager.get_user_recommendations("userA", 5) == rec1
+        assert manager.get_user_recommendations("userB", 5) == rec2
+
+        manager.invalidate_user_cache("userA")
+
+        assert manager.get_user_recommendations("userA", 5) is None
+        assert manager.get_user_recommendations("userB", 5) == rec2
+
+        manager.invalidate_user_cache()
+        assert manager.get_user_recommendations("userB", 5) is None
+
+    def test_invalidate_item_cache_specific(self):
+        config = CacheConfig(enabled=True)
+        manager = CacheManager(config)
+
+        items_a = (["item2"], [0.9], [{"title": "Item 2"}])
+        items_b = (["item3"], [0.8], [{"title": "Item 3"}])
+
+        manager.set_similar_items("itemA", 3, items_a)
+        manager.set_similar_items("itemB", 3, items_b)
+
+        assert manager.get_similar_items("itemA", 3) == items_a
+        assert manager.get_similar_items("itemB", 3) == items_b
+
+        manager.invalidate_item_cache("itemA")
+
+        assert manager.get_similar_items("itemA", 3) is None
+        assert manager.get_similar_items("itemB", 3) == items_b
+
+        manager.invalidate_item_cache()
+        assert manager.get_similar_items("itemB", 3) is None
+
     def test_cache_disabled(self):
         """Test behavior when cache is disabled."""
         config = CacheConfig(enabled=False)

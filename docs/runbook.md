@@ -1,6 +1,6 @@
 # RecSys-Lite Operations Runbook
 
-This runbook provides detailed operational guidance for deploying, maintaining, and troubleshooting the RecSys-Lite recommendation system. RecSys-Lite is a lightweight recommendation engine designed for small e-commerce shops, providing personalized product recommendations with minimal computational resources.
+This runbook provides detailed operational guidance for deploying, maintaining, and troubleshooting the RecSys-Lite recommendation system v0.3.2. RecSys-Lite is a lightweight recommendation engine designed for small e-commerce shops, providing personalized product recommendations with minimal computational resources.
 
 ## Table of Contents
 
@@ -75,10 +75,7 @@ RecSys-Lite is a lightweight recommendation system for small e-commerce shops. I
 Expected response:
 ```json
 {
-  "status": "ok",
-  "version": "0.1.1",
-  "model_type": "als",
-  "uptime_seconds": 5
+  "status": "healthy"
 }
 ```
 
@@ -103,7 +100,7 @@ Expected response:
 
 3. Start API service:
    ```bash
-   # Using CLI
+   # Using CLI (located in src/recsys_lite/cli/serve.py)
    recsys-lite serve --model-dir model_artifacts/als --port 8000
 
    # Or using uvicorn directly
@@ -162,6 +159,15 @@ Sample data:
 └────────────┴──────────────┴────────────┴───────┴───────────────────────────────┘
 ```
 
+### CLI Structure
+
+RecSys-Lite CLI is organized into modules in `src/recsys_lite/cli/`:
+- **gdpr.py**: GDPR compliance commands (export-user, delete-user)
+- **ingest.py**: Data ingestion commands (ingest, stream-ingest)
+- **model.py**: Model training and evaluation commands (train, evaluate)
+- **optimize.py**: Hyperparameter optimization commands (optimize)
+- **serve.py**: API server commands (serve, worker)
+
 ### Initial Data Load
 
 Load initial data into the DuckDB database:
@@ -173,7 +179,7 @@ docker exec -it recsys-lite_api recsys-lite ingest \
   --items /data/items.csv \
   --db /data/recsys.db
 
-# Direct CLI usage
+# Direct CLI usage (ingest command in src/recsys_lite/cli/ingest.py)
 recsys-lite ingest \
   --events data/events.parquet \
   --items data/items.csv \
@@ -228,14 +234,16 @@ RecSys-Lite supports multiple recommendation models. Each model has specific str
 
 ### Model Selection Guide
 
-| Model | Strengths | Ideal For |
-|-------|-----------|-----------|
-| ALS | Fast, scalable, general-purpose | Most use cases, sparse data |
-| BPR | Optimized for ranking quality | Ranked display of recommendations |
-| item2vec | Captures item similarity | Similar item recommendations |
-| LightFM | Handles cold start, uses item features | New items, content-rich catalogs |
-| GRU4Rec | Captures sequential patterns | Session-based recommendations |
-| EASE | High accuracy, closed‑form linear model | General CF (no user factors) |
+| Model | Strengths | Ideal For | Production Status |
+|-------|-----------|-----------|-------------------|
+| ALS | Fast, scalable, general-purpose | Most use cases, sparse data | Production ready |
+| BPR | Optimized for ranking quality | Ranked display of recommendations | Production ready |
+| item2vec | Captures item similarity | Similar item recommendations | Production ready |
+| LightFM | Handles cold start, uses item features | New items, content-rich catalogs | Mock implementation in CI |
+| GRU4Rec | Captures sequential patterns | Session-based recommendations | Mock implementation in CI |
+| EASE | High accuracy, closed‑form linear model | General CF (no user factors) | Production ready |
+
+**Note on Mock Implementations**: Some models (GRU4Rec, LightFM) have mock implementations for CI environments to avoid dependency conflicts. In production, these models provide full functionality. For development and testing, you can use ALS, BPR, item2vec, or EASE models which are fully implemented.
 
 ### Initial Training
 
@@ -350,13 +358,20 @@ The RecSys-Lite API provides endpoints for recommendations and monitoring.
 
 | Endpoint | Method | Description | Parameters |
 |----------|--------|-------------|------------|
-| `/recommend` | GET | Get user recommendations | `user_id`, `k` (number of items), `use_faiss` (boolean) |
-| `/similar-items` | GET | Get similar items | `item_id`, `k` (number of items) |
+| `/recommend` | GET | Get user recommendations | `user_id`, `k`, `use_faiss`, `page`, `page_size`, `categories`, `brands`, `min_price`, `max_price`, `exclude_items`, `include_items` |
+| `/similar-items` | GET | Get similar items | `item_id`, `k`, `page`, `page_size`, `categories`, `brands`, `min_price`, `max_price`, `exclude_items` |
 | `/health` | GET | Health check | None |
 | `/metrics` | GET | Performance metrics | None |
+| `/cache/stats` | GET | Get cache statistics | None |
+| `/cache/warm` | POST | Warm cache with popular users/items | `popular_users`, `popular_items` (query params) |
+| `/cache/clear` | POST | Clear all cache entries | None |
+| `/cache/invalidate/user` | POST | Invalidate user cache | `user_id` (optional query param) |
+| `/cache/invalidate/item` | POST | Invalidate item cache | `item_id` (optional query param) |
+| `/cache/invalidate/model` | POST | Invalidate model cache | `model_version` (optional query param) |
 
 ### Example Requests
 
+#### Basic Recommendations
 ```bash
 # Get recommendations for a user
 curl "http://localhost:8000/recommend?user_id=user123&k=10"
@@ -371,9 +386,54 @@ curl "http://localhost:8000/health"
 curl "http://localhost:8000/metrics"
 ```
 
+#### Recommendations with Pagination
+```bash
+# Get page 2 of recommendations (5 items per page)
+curl "http://localhost:8000/recommend?user_id=user123&k=20&page=2&page_size=5"
+
+# Get page 1 of similar items with custom page size
+curl "http://localhost:8000/similar-items?item_id=item456&k=15&page=1&page_size=10"
+```
+
+#### Recommendations with Filtering
+```bash
+# Filter by categories and price range
+curl "http://localhost:8000/recommend?user_id=user123&k=10&categories=Electronics&categories=Clothing&min_price=20&max_price=100"
+
+# Filter by brands and exclude specific items
+curl "http://localhost:8000/recommend?user_id=user123&k=10&brands=TechBrand&brands=FashionCo&exclude_items=item789&exclude_items=item456"
+
+# Limit to specific items only
+curl "http://localhost:8000/recommend?user_id=user123&k=10&include_items=item111&include_items=item222&include_items=item333"
+```
+
+#### Cache Management
+```bash
+# Get cache statistics
+curl "http://localhost:8000/cache/stats"
+
+# Clear all cache
+curl -X POST "http://localhost:8000/cache/clear"
+
+# Warm cache with popular users and items
+curl -X POST "http://localhost:8000/cache/warm?popular_users=user123&popular_users=user456&popular_items=item789&popular_items=item123"
+
+# Invalidate cache for specific user
+curl -X POST "http://localhost:8000/cache/invalidate/user?user_id=user123"
+
+# Invalidate cache for all users
+curl -X POST "http://localhost:8000/cache/invalidate/user"
+
+# Invalidate cache for specific item
+curl -X POST "http://localhost:8000/cache/invalidate/item?item_id=item456"
+
+# Invalidate model cache after model update
+curl -X POST "http://localhost:8000/cache/invalidate/model?model_version=v2.1.0"
+```
+
 ### Response Format
 
-Recommendations are returned in JSON format with item metadata:
+Recommendations are returned in JSON format with item metadata, pagination, and filtering information:
 
 ```json
 {
@@ -387,9 +447,60 @@ Recommendations are returned in JSON format with item metadata:
       "brand": "BrandName",
       "price": 99.99,
       "img_url": "https://example.com/images/item789.jpg"
-    },
-    // Additional items...
-  ]
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "page_size": 10,
+    "total_items": 25,
+    "total_pages": 3,
+    "has_next": true,
+    "has_previous": false
+  },
+  "filters": {
+    "categories": ["Electronics", "Clothing"],
+    "brands": ["TechBrand"],
+    "min_price": 20.0,
+    "max_price": 100.0,
+    "items_filtered": 5,
+    "items_before_filtering": 30
+  }
+}
+```
+
+#### Cache Statistics Response
+```json
+{
+  "cache_stats": {
+    "total_keys": 150,
+    "hit_count": 1200,
+    "miss_count": 300,
+    "hit_rate": 0.8
+  },
+  "cache_enabled": true
+}
+```
+
+#### Cache Management Responses
+```json
+{
+  "cleared": true,
+  "message": "Cache cleared successfully"
+}
+```
+
+```json
+{
+  "users_warmed": 50,
+  "items_warmed": 100,
+  "message": "Cache warmed: 50 users, 100 items"
+}
+```
+
+```json
+{
+  "status": "success",
+  "message": "Invalidated cache for user: user123"
 }
 ```
 
@@ -400,9 +511,24 @@ The API may return these error responses:
 | Status Code | Description | Example |
 |-------------|-------------|---------|
 | 400 | Bad Request | Invalid parameters |
-| 404 | Not Found | User ID or Item ID not found |
+| 404 | Not Found | User ID or Item ID not found (UserNotFoundError, ItemNotFoundError) |
 | 422 | Unprocessable Entity | Invalid request format |
-| 500 | Internal Server Error | Server-side error |
+| 500 | Internal Server Error | ModelNotInitializedError, VectorRetrievalError, RecSysError |
+
+#### Error Types
+- **UserNotFoundError**: User ID not found in the system
+- **ItemNotFoundError**: Item ID not found in the system
+- **ModelNotInitializedError**: Recommendation model is not properly initialized
+- **VectorRetrievalError**: Failed to retrieve vectors from Faiss index
+- **RecSysError**: General recommendation system error
+
+Example error response:
+```json
+{
+  "detail": "User not found: user123",
+  "error_code": "USER_NOT_FOUND"
+}
+```
 
 ### API Configuration
 
@@ -503,6 +629,122 @@ recsys-lite worker \
   --model-dir model_artifacts/als \
   --db data/recsys.db \
   --interval 60
+
+## Cache Management
+
+RecSys-Lite includes a comprehensive cache management system for optimizing recommendation performance. The cache system supports both in-memory (LRU) and Redis-based caching.
+
+### Cache Architecture
+
+The cache manager provides several layers of caching:
+- **Recommendation caching**: Stores user recommendations to reduce computation
+- **Similar items caching**: Caches item similarity results
+- **Model prediction caching**: Caches model outputs
+- **Metadata caching**: Stores frequently accessed item metadata
+
+### Cache Statistics
+
+Monitor cache performance with the stats endpoint:
+
+```bash
+curl "http://localhost:8000/cache/stats"
+```
+
+Response includes:
+- Total cache keys
+- Hit/miss counts and rates
+- Cache enabled status
+
+### Cache Operations
+
+#### Warming Cache
+Pre-populate cache with popular users and items:
+
+```bash
+curl -X POST "http://localhost:8000/cache/warm?popular_users=user123&popular_users=user456&popular_items=item789"
+```
+
+#### Clearing Cache
+Remove all cache entries:
+
+```bash
+curl -X POST "http://localhost:8000/cache/clear"
+```
+
+#### Selective Invalidation
+
+**User-specific invalidation:**
+```bash
+# Invalidate specific user
+curl -X POST "http://localhost:8000/cache/invalidate/user?user_id=user123"
+
+# Invalidate all users
+curl -X POST "http://localhost:8000/cache/invalidate/user"
+```
+
+**Item-specific invalidation:**
+```bash
+# Invalidate specific item
+curl -X POST "http://localhost:8000/cache/invalidate/item?item_id=item456"
+
+# Invalidate all items
+curl -X POST "http://localhost:8000/cache/invalidate/item"
+```
+
+**Model cache invalidation:**
+```bash
+# Invalidate when model is updated
+curl -X POST "http://localhost:8000/cache/invalidate/model?model_version=v2.1.0"
+```
+
+### Cache Configuration
+
+Configure cache behavior via environment variables:
+
+```bash
+export CACHE_ENABLED=true
+export CACHE_TYPE=redis  # or 'memory' for LRU
+export CACHE_EXPIRY=300  # seconds
+export CACHE_MAX_SIZE=1000  # for LRU cache
+export REDIS_URL=redis://localhost:6379  # for Redis cache
+```
+
+All cache operations delete the underlying cache keys (LRU or Redis) and after invalidation, the next read will repopulate data from the source of truth.
+
+## Vector Service Architecture
+
+RecSys-Lite uses a sophisticated vector service for fast similarity search and recommendations. The vector service is built on top of Faiss (Facebook AI Similarity Search) for efficient nearest neighbor search.
+
+### Components
+
+- **Vector Index**: Faiss-based index for fast similarity search
+- **Item Embeddings**: Vector representations of items from trained models
+- **User Embeddings**: Vector representations of users (when available)
+- **Similarity Engine**: Handles vector similarity computations
+
+### Vector Operations
+
+The vector service provides several key operations:
+
+1. **Vector Retrieval**: Get vector representations for users and items
+2. **Similarity Search**: Find similar items using vector similarity
+3. **Batch Operations**: Process multiple vectors efficiently
+4. **Index Management**: Update and rebuild vector indices
+
+### Error Handling
+
+Vector operations may raise:
+- **VectorRetrievalError**: When vectors cannot be retrieved from the index
+- **ModelNotInitializedError**: When the vector service is not properly initialized
+
+### Configuration
+
+```bash
+# Faiss index configuration
+export FAISS_NLIST=100      # Number of clusters
+export FAISS_NPROBE=10      # Clusters to search (speed vs accuracy)
+export FAISS_USE_THREADS=1  # Enable threading
+export VECTOR_CACHE_SIZE=1000  # Cache size for vectors
 ```
 
 ## Performance Tuning
@@ -690,7 +932,7 @@ User data is stored in:
 
 ### User Data Export
 
-Export all data associated with a user:
+Export all data associated with a user using the GDPR module (`src/recsys_lite/cli/gdpr.py`):
 
 ```bash
 # Export a user's data
@@ -744,7 +986,7 @@ Example export format:
 
 ### User Data Deletion
 
-Delete a user's data from the system:
+Delete a user's data from the system using the GDPR module:
 
 ```bash
 # Delete a user's data

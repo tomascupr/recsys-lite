@@ -16,7 +16,7 @@
   - Update API error handling/tests to expect deterministic responses.
   - Run refreshed API pytest suite.
 
-- [ ] **Step 4 – Implement Real Cache Invalidation**
+- [x] **Step 4 – Implement Real Cache Invalidation**
   - Track cache keys for LRU/Redis, implement actual deletion in invalidate endpoints.
   - Back with unit tests and API endpoint assertions.
 

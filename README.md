@@ -2,7 +2,7 @@
 
 **Deploy state-of-the-art recommendations without selling your soul to AWS.**
 
-![RecSys-Lite](https://img.shields.io/badge/RecSys--Lite-v0.3.1-blue)
+![RecSys-Lite](https://img.shields.io/badge/RecSys--Lite-v0.3.2-blue)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100.0-green)
 ![React](https://img.shields.io/badge/React-18-blue)
@@ -28,6 +28,12 @@ poetry run recsys-lite serve
 
 # 🎉 Your recommendation API is live at http://localhost:8000
 ```
+
+> **What’s fresh in 0.3.2?**
+> - 🔄 Zero-downtime incremental updates: worker now syncs mappings and Faiss indices safely.
+> - 🧹 Real cache invalidation: `/cache/invalidate/*` deletes actual keys (LRU or Redis).
+> - 🛡️ Deterministic vector retrieval: surfaces actionable `VectorRetrievalError`s with an opt-in legacy fallback.
+> - ✅ Safer ingestion: schema validation + idempotent DuckDB loads so reruns won’t corrupt prod data.
 
 ## 💰 The Money Shot: RecSys-Lite vs The Competition
 
@@ -81,6 +87,7 @@ Choose your weapon based on your data:
 **🎯 Smart Caching & Performance**
 - Sub-millisecond response times (seriously, try it)
 - Built-in caching with TTL control
+- Targeted cache invalidation for users/items with one API call
 - Faiss ANN search (1M items? No problem)
 - Automatic incremental updates
 

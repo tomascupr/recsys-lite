@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.1] - 2025-07-26
 
+## [0.3.2] - 2025-09-17
+
+### Added
+- Contributor onboarding guide (`AGENTS.md`) outlining workflow, coding style, and testing expectations.
+- Unit suites covering incremental update worker and cache invalidation behaviour to prevent regressions.
+
+### Changed
+- Stabilised incremental update worker by respecting persisted mappings, persisting new users, and safely updating Faiss indices.
+- Refactored batch ingestion to validate schemas and replace DuckDB tables atomically for repeatable loads.
+- Made vector retrieval deterministic by surfacing `VectorRetrievalError` when models lack vectors, with an opt-in random fallback flag.
+- Implemented real cache invalidation with key tracking for user/item recommendations and vectors, and exposed CLI/API docs for managing cache state.
+- Unified lightweight Redis stub across environments to ensure predictable cache fallbacks.
+
 ### Security
 - Updated FastAPI from 0.100.x to 0.116.x to address Starlette security vulnerabilities
 - Updated uvicorn from 0.23.x to 0.35.x for security improvements
