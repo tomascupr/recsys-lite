@@ -310,7 +310,7 @@ class FilteringService:
         if include_items:
             filter_info["filters_applied"]["included_items"] = len(include_items)
 
-        for item_id, score, metadata in zip(item_ids, scores, item_metadata, strict=False):
+        for item_id, score, metadata in zip(item_ids, scores, item_metadata):
             # Skip excluded items
             if item_id in exclusion_set:
                 continue

@@ -222,7 +222,7 @@ def create_recommendation_objects(
             price=metadata.get("price"),
             img_url=metadata.get("img_url"),
         )
-        for item_id, score, metadata in zip(item_ids, scores, item_metadata, strict=False)
+        for item_id, score, metadata in zip(item_ids, scores, item_metadata)
     ]
 
 
