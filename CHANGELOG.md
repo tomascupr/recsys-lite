@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Made vector retrieval deterministic by surfacing `VectorRetrievalError` when models lack vectors, with an opt-in random fallback flag.
 - Implemented real cache invalidation with key tracking for user/item recommendations and vectors, and exposed CLI/API docs for managing cache state.
 - Unified lightweight Redis stub across environments to ensure predictable cache fallbacks.
+- Upgraded `pyarrow` to 17.0.0 to pick up upstream security fixes.
 
 ### Security
 - Updated FastAPI from 0.100.x to 0.116.x to address Starlette security vulnerabilities
